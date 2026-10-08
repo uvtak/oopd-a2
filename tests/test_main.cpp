@@ -263,6 +263,55 @@ static void testHardcoverPricing() {
 
     CHECK_THROWS(hardcover.costFor(0), std::invalid_argument);
 }
+static void testBulkDiscounts() {
+    // Print item: 10% discount for 10 or more copies.
+    Book paperback(
+        "BP1", "Bulk Book",
+        {"Author"}, "ISBN1", "Publisher",
+        2026, Money::of(100),
+        1, Binding::Paperback
+    );
+
+    CHECK(paperback.costFor(9) == Money::of(900));
+    CHECK(paperback.costFor(10) == Money::of(900));
+    CHECK(paperback.costFor(20) == Money::of(1800));
+
+    // Hardcover price increase from Q4 + 10% bulk discount from Q5.
+    Book hardcover(
+        "BH1", "Bulk Hardcover",
+        {"Author"}, "ISBN2", "Publisher",
+        2026, Money::of(100),
+        1, Binding::Hardcover
+    );
+
+    CHECK(hardcover.costFor(10) == Money::of(1080));
+
+    // Journal is also a print item.
+    Journal journal(
+        "J1", "Journal",
+        "1234-5678", 12,
+        "Publisher", 2026,
+        Money::of(50), 2
+    );
+
+    // 50 × 10 copies × 2 years = 1000, then 10% off = 900.
+    CHECK(journal.costFor(9) == Money::of(900));
+    CHECK(journal.costFor(10) == Money::of(900));
+
+    // Electronic resource:
+    // first 50 seats at full price, seats beyond 50 at half price.
+    ElectronicResource er(
+        "R1", "Database",
+        "Publisher", 2026,
+        Money::of(100), "https://example.com",
+        LicenseModel::AnnualSubscription,
+        Money::of(500)
+    );
+
+    CHECK(er.costFor(50) == Money::of(5500));
+    CHECK(er.costFor(51) == Money::of(5550));
+    CHECK(er.costFor(60) == Money::of(6000));
+}
 static void testCatalog() {
     Catalog c;
     c.emplace<Book>("B1", "Clean Code", std::vector<std::string>{"M"}, "i", "P", 2008,
@@ -362,6 +411,7 @@ int main() {
     testEBook();
     testAudioBookAndThesis();
     testHardcoverPricing();
+    testBulkDiscounts();
     testCatalog();
     testBudget();
     testAcquisition();

@@ -41,7 +41,15 @@ void Resource::requirePositive(int quantity) {
 
 Money Resource::costFor(int quantity) const {
     requirePositive(quantity);
-    return unitPrice_ * quantity;
+
+    Money total = unitPrice() * quantity;
+
+    if (quantity >= 10) {
+        // 10% bulk discount for print resources.
+        return Money::fromMinor((total.minorUnits() * 9) / 10);
+    }
+
+    return total;
 }
 
 void Resource::print(std::ostream& os) const {
