@@ -110,6 +110,49 @@ static void testJournal() {
 
     CHECK(budgetOut.str().find("Journal") != std::string::npos);
 }
+static void testMagazine() {
+    Magazine m(
+        "M1",
+        "TIME Magazine",
+        "0040-781X",
+        52,
+        "Time USA",
+        2026,
+        Money::of(500),
+        2,
+        Money::of(10)
+    );
+
+    CHECK(m.category() == ResourceCategory::Journal);
+    CHECK(!m.isDigital());
+
+    CHECK(m.issn() == "0040-781X");
+    CHECK(m.issuesPerYear() == 52);
+    CHECK(m.subscriptionYears() == 2);
+    CHECK(m.postagePerIssue() == Money::of(10));
+
+    // Subscription = 500 × 2 × 2 = 2000
+    // Postage = 10 × 52 × 2 × 2 = 2080
+    // Total = 4080
+    CHECK(m.costFor(2) == Money::of(4080));
+
+    CHECK_THROWS(m.costFor(0), std::invalid_argument);
+
+    CHECK_THROWS(
+        Magazine("M2", "Bad Magazine", "1234-5678",
+                 12, "Publisher", 2026,
+                 Money::of(100), 1, Money::of(-1)),
+        std::invalid_argument
+    );
+
+    std::ostringstream os;
+    m.print(os);
+
+    CHECK(os.str().find("issn: 0040-781X") != std::string::npos);
+    CHECK(os.str().find("issues per year: 52") != std::string::npos);
+    CHECK(os.str().find("subscription years: 2") != std::string::npos);
+    CHECK(os.str().find("postage per issue: 10.00") != std::string::npos);
+}
 static void testEBook() {
     EBook e(
         "E1",
@@ -489,6 +532,7 @@ int main() {
     testMoney();
     testResourcesAndCost();
     testJournal();
+    testMagazine();
     testEBook();
     testAudioBookAndThesis();
     testHardcoverPricing();

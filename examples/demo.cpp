@@ -23,6 +23,17 @@ int main() {
                                         LicenseModel::Perpetual);
     catalog.emplace<Journal>("J001", "Nature", "1476-4687", 52,
                           "Springer Nature", 2026, Money::of(500), 2);
+    catalog.emplace<Magazine>(
+    "M001",
+    "TIME Magazine",
+    "0040-781X",
+    52,
+    "Time USA",
+    2026,
+    Money::of(500),
+    1,
+    Money::of(20)
+);
     catalog.emplace<AudioBook>(
     "A001",
     "The Pragmatic Programmer",
@@ -64,6 +75,7 @@ catalog.emplace<Thesis>(
 
     std::cout << "\n=== Details of R001 ===\n" << catalog.get("R001");
     std::cout << "\n=== Details of J001 ===\n" << catalog.get("J001");
+    std::cout << "\n=== Details of M001 ===\n" << catalog.get("M001");
     std::cout << "\n=== Details of E001 ===\n" << catalog.get("E001");
     std::cout << "\n=== Details of A001 ===\n" << catalog.get("A001");
     std::cout << "\n=== Details of T001 ===\n" << catalog.get("T001");
@@ -79,6 +91,7 @@ catalog.emplace<Thesis>(
     std::cout << "1 copy of B002   = " << acq.quote("B002", 1) << "  (Hardcover, 20% surcharge)\n";
     std::cout << "20 seats of R001  = " << acq.quote("R001", 20) << "  (incl. platform fee)\n";
     std::cout << "2 copies of J001  = " << acq.quote("J001", 2) << "  (2-year subscription)\n";
+    std::cout << "2 copies of M001  = " << acq.quote("M001", 2) << "  (includes postage)\n";
     std::cout << "3 seats of E001   = " << acq.quote("E001", 3) << "  (incl. platform fee)\n";
     std::cout << "10 copies of B001 = " << acq.quote("B001", 10) << "  (10% bulk discount)\n";
     std::cout << "10 copies of J001 = " << acq.quote("J001", 10) << "  (10% bulk discount)\n";
