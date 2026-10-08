@@ -110,11 +110,89 @@ catalog.emplace<Thesis>(
                   << (r->isDigital() ? " seats" : " copies") << "\n";
 
     // Direct purchase: errors are reported with exceptions
-    std::cout << "\n=== Direct purchase that breaks a quota ===\n";
-    try {
-        acq.purchase("B002", 1);
-    } catch (const QuotaExceededError& e) {
-        std::cout << "QuotaExceededError: " << e.what() << "\n";
-    }
-    return 0;
+std::cout << "\n=== Direct purchase that breaks a quota ===\n";
+try {
+    acq.purchase("B002", 1);
+} catch (const QuotaExceededError& e) {
+    std::cout << "QuotaExceededError: " << e.what() << "\n";
+}
+
+/*
+ * Q6: Tax demonstration.
+ *
+ * Print resources use 10% tax.
+ * Electronic resources use 20% tax.
+ *
+ * Budget/quota checks use the post-tax cost.
+ */
+std::cout << "\n=== Tax Demo ===\n";
+
+Catalog taxCatalog;
+
+taxCatalog.emplace<Book>(
+    "TB1",
+    "Taxed Book",
+    std::vector<std::string>{"Author"},
+    "ISBN-TAX",
+    "Publisher",
+    2026,
+    Money::of(100)
+);
+
+taxCatalog.emplace<ElectronicResource>(
+    "TR1",
+    "Taxed Database",
+    "Publisher",
+    2026,
+    Money::of(100),
+    "https://tax.example",
+    LicenseModel::AnnualSubscription,
+    Money::of(50)
+);
+
+Budget taxBudget(Money::of(1000));
+
+taxBudget.setQuota(
+    ResourceCategory::Book,
+    {10, Money::of(300)}
+);
+
+taxBudget.setQuota(
+    ResourceCategory::ElectronicResource,
+    {10, Money::of(400)}
+);
+
+AcquisitionManager taxAcq(taxCatalog, taxBudget);
+
+taxAcq.setTaxRates(10, 20);
+
+std::cout << "Print tax rate: "
+          << taxAcq.printTaxPercent() << "%\n";
+
+std::cout << "Electronic tax rate: "
+          << taxAcq.electronicTaxPercent() << "%\n";
+
+/*
+ * Book:
+ * pre-tax  = 100 × 2 = 200
+ * tax      = 20
+ * post-tax = 220
+ */
+taxAcq.purchase("TB1", 2);
+
+/*
+ * Electronic resource:
+ * pre-tax  = 50 platform fee + (100 × 2) = 250
+ * tax      = 50
+ * post-tax = 300
+ */
+taxAcq.purchase("TR1", 2);
+
+std::cout << "\n=== Tax Acquisition Report ===\n";
+taxAcq.printReport(std::cout);
+
+std::cout << "\n=== Tax Budget ===\n";
+taxBudget.print(std::cout);
+
+return 0;
 }

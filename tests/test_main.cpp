@@ -312,6 +312,87 @@ static void testBulkDiscounts() {
     CHECK(er.costFor(51) == Money::of(5550));
     CHECK(er.costFor(60) == Money::of(6000));
 }
+static void testTaxes() {
+    Catalog c;
+
+    c.emplace<Book>(
+        "B1",
+        "Taxed Book",
+        std::vector<std::string>{"Author"},
+        "ISBN",
+        "Publisher",
+        2026,
+        Money::of(100)
+    );
+
+    c.emplace<ElectronicResource>(
+        "R1",
+        "Taxed Database",
+        "Publisher",
+        2026,
+        Money::of(100),
+        "https://example.com",
+        LicenseModel::AnnualSubscription,
+        Money::of(50)
+    );
+
+    Budget b(Money::of(1000));
+    b.setQuota(ResourceCategory::Book, {10, Money::of(250)});
+    b.setQuota(ResourceCategory::ElectronicResource, {10, Money::of(400)});
+
+    AcquisitionManager acq(c, b);
+
+    // 10% tax on print resources, 20% tax on electronic resources.
+    acq.setTaxRates(10, 20);
+
+    CHECK(acq.printTaxPercent() == 10);
+    CHECK(acq.electronicTaxPercent() == 20);
+
+    // Book:
+    // pre-tax = 100
+    // tax = 10
+    // post-tax = 110
+    CHECK(acq.canPurchase("B1", 2));
+
+    std::string why;
+    CHECK(!acq.canPurchase("B1", 3, &why));
+    CHECK(why.find("spend quota") != std::string::npos);
+
+    const auto& bookRecord = acq.purchase("B1", 2);
+
+    CHECK(bookRecord.preTaxCost == Money::of(200));
+    CHECK(bookRecord.cost == Money::of(220));
+
+    // Electronic resource:
+    // pre-tax = platform fee 50 + 100 × 2 = 250
+    // tax = 20% of 250 = 50
+    // post-tax = 300
+    CHECK(acq.canPurchase("R1", 2));
+
+    const auto& electronicRecord = acq.purchase("R1", 2);
+
+    CHECK(electronicRecord.preTaxCost == Money::of(250));
+    CHECK(electronicRecord.cost == Money::of(300));
+
+    // Negative tax rates are invalid.
+    CHECK_THROWS(acq.setTaxRates(-1, 10), std::invalid_argument);
+    CHECK_THROWS(acq.setTaxRates(10, -1), std::invalid_argument);
+
+    // Report should contain both pre-tax and post-tax values.
+    std::ostringstream report;
+    acq.printReport(report);
+
+    CHECK(report.str().find("pre-tax 200.00") != std::string::npos);
+    CHECK(report.str().find("post-tax 220.00") != std::string::npos);
+    CHECK(report.str().find("pre-tax 250.00") != std::string::npos);
+    CHECK(report.str().find("post-tax 300.00") != std::string::npos);
+
+    // Budget spent must use post-tax amounts.
+    CHECK(b.spent() == Money::of(520));
+
+    // Total spent must also use post-tax amounts.
+    CHECK(acq.totalSpent() == Money::of(520));
+}
 static void testCatalog() {
     Catalog c;
     c.emplace<Book>("B1", "Clean Code", std::vector<std::string>{"M"}, "i", "P", 2008,
@@ -412,6 +493,7 @@ int main() {
     testAudioBookAndThesis();
     testHardcoverPricing();
     testBulkDiscounts();
+    testTaxes();
     testCatalog();
     testBudget();
     testAcquisition();
