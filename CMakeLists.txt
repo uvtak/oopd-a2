@@ -12,6 +12,8 @@ add_library(bookmgmt
     src/ElectronicResource.cpp
     src/Journal.cpp
     src/Budget.cpp
+    src/AudioBook.cpp
+    src/Thesis.cpp
     src/Catalog.cpp
     src/Acquisition.cpp
     src/EBook.cpp

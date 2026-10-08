@@ -13,7 +13,9 @@ namespace {
 const ResourceCategory kAllCategories[] = {ResourceCategory::Book,
                                            ResourceCategory::ElectronicResource,
                                            ResourceCategory::Journal,
-                                           ResourceCategory::EBook};
+                                           ResourceCategory::EBook,
+                                            ResourceCategory::AudioBook,
+                                            ResourceCategory::Thesis};
 }
 
 Budget::Budget(Money total) : total_(total) {

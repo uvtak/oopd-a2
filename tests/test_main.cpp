@@ -174,6 +174,75 @@ static void testEBook() {
 
     CHECK(budgetOut.str().find("EBook") != std::string::npos);
 }
+static void testAudioBookAndThesis() {
+    AudioBook audio(
+        "A1",
+        "The Pragmatic Programmer",
+        "John Doe",
+        540,
+        "Tech Publisher",
+        2026,
+        Money::of(100),
+        "https://audio.example/pragmatic",
+        LicenseModel::AnnualSubscription,
+        Money::of(50)
+    );
+
+    CHECK(audio.category() == ResourceCategory::AudioBook);
+    CHECK(categoryName(audio.category()) == std::string("AudioBook"));
+    CHECK(audio.isDigital());
+
+    CHECK(audio.narrator() == "John Doe");
+    CHECK(audio.durationMinutes() == 540);
+
+    // AudioBook inherits ElectronicResource pricing unchanged:
+    // platform fee + unit price × seats
+    CHECK(audio.costFor(3) == Money::of(350));
+
+    std::ostringstream audioOut;
+    audio.print(audioOut);
+
+    CHECK(audioOut.str().find("access url: https://audio.example/pragmatic") !=
+          std::string::npos);
+    CHECK(audioOut.str().find("platform fee: 50.00") !=
+          std::string::npos);
+    CHECK(audioOut.str().find("narrator: John Doe") !=
+          std::string::npos);
+    CHECK(audioOut.str().find("duration minutes: 540") !=
+          std::string::npos);
+
+
+    Thesis thesis(
+        "T1",
+        "Efficient Graph Algorithms",
+        "IIIT Delhi",
+        "M.Tech CSE",
+        "Dr. Professor",
+        2026
+    );
+
+    CHECK(thesis.category() == ResourceCategory::Thesis);
+    CHECK(categoryName(thesis.category()) == std::string("Thesis"));
+    CHECK(!thesis.isDigital());
+
+    CHECK(thesis.university() == "IIIT Delhi");
+    CHECK(thesis.degree() == "M.Tech CSE");
+    CHECK(thesis.supervisor() == "Dr. Professor");
+
+    // Thesis can be free of cost.
+    CHECK(thesis.unitPrice() == Money{});
+    CHECK(thesis.costFor(3) == Money{});
+
+    std::ostringstream thesisOut;
+    thesis.print(thesisOut);
+
+    CHECK(thesisOut.str().find("university: IIIT Delhi") !=
+          std::string::npos);
+    CHECK(thesisOut.str().find("degree: M.Tech CSE") !=
+          std::string::npos);
+    CHECK(thesisOut.str().find("supervisor: Dr. Professor") !=
+          std::string::npos);
+}
 static void testCatalog() {
     Catalog c;
     c.emplace<Book>("B1", "Clean Code", std::vector<std::string>{"M"}, "i", "P", 2008,
@@ -271,6 +340,7 @@ int main() {
     testResourcesAndCost();
     testJournal();
     testEBook();
+    testAudioBookAndThesis();
     testCatalog();
     testBudget();
     testAcquisition();

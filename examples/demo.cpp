@@ -23,6 +23,27 @@ int main() {
                                         LicenseModel::Perpetual);
     catalog.emplace<Journal>("J001", "Nature", "1476-4687", 52,
                           "Springer Nature", 2026, Money::of(500), 2);
+    catalog.emplace<AudioBook>(
+    "A001",
+    "The Pragmatic Programmer",
+    "John Doe",
+    540,
+    "Tech Publisher",
+    2026,
+    Money::of(100),
+    "https://audio.example/pragmatic",
+    LicenseModel::AnnualSubscription,
+    Money::of(50)
+);
+
+catalog.emplace<Thesis>(
+    "T001",
+    "Efficient Graph Algorithms",
+    "IIIT Delhi",
+    "M.Tech CSE",
+    "Dr. Professor",
+    2026
+);
     catalog.emplace<EBook>(
     "E001",
     "Clean Code EBook",
@@ -36,6 +57,7 @@ int main() {
     Money::of(500),
     "EPUB",
     true
+    
 );
     std::cout << "=== Catalog ===\n";
     for (const Resource* r : catalog.all()) std::cout << r->summary() << "\n";
@@ -43,7 +65,8 @@ int main() {
     std::cout << "\n=== Details of R001 ===\n" << catalog.get("R001");
     std::cout << "\n=== Details of J001 ===\n" << catalog.get("J001");
     std::cout << "\n=== Details of E001 ===\n" << catalog.get("E001");
-
+    std::cout << "\n=== Details of A001 ===\n" << catalog.get("A001");
+    std::cout << "\n=== Details of T001 ===\n" << catalog.get("T001");
     Budget budget(Money::of(22000));
     budget.setQuota(ResourceCategory::Book, {10, Money::of(8000)});
     budget.setQuota(ResourceCategory::ElectronicResource, {40, Money::of(12000)});
@@ -56,6 +79,8 @@ int main() {
     std::cout << "20 seats of R001  = " << acq.quote("R001", 20) << "  (incl. platform fee)\n";
     std::cout << "2 copies of J001  = " << acq.quote("J001", 2) << "  (2-year subscription)\n";
     std::cout << "3 seats of E001   = " << acq.quote("E001", 3) << "  (incl. platform fee)\n";
+    std::cout << "2 seats of A001   = " << acq.quote("A001", 2) << "  (incl. platform fee)\n";
+    std::cout << "2 copies of T001  = " << acq.quote("T001", 2) << "  (thesis)\n";
     acq.processBatch({
         {"B001", 4},   // 1800  ok
         {"B002", 5},   // 6000  ok  -> book spend 7800
