@@ -24,7 +24,19 @@ Book::Book(std::string id, std::string title, std::vector<std::string> authors,
       binding_(binding) {
     if (edition_ < 1) throw std::invalid_argument("edition must be >= 1");
 }
+Money Book::costFor(int quantity) const {
+    requirePositive(quantity);
 
+    Money total = Resource::costFor(quantity);
+
+    if (binding_ == Binding::Hardcover) {
+        // Hardcover costs 20% more than the listed price.
+        // Money is stored in minor units, so use integer arithmetic.
+        return Money::fromMinor((total.minorUnits() * 6) / 5);
+    }
+
+    return total;
+}
 void Book::printDetails(std::ostream& os) const {
     os << "  authors: " << joinAuthors(authors_) << "\n"
        << "  isbn: " << isbn_ << "\n"

@@ -243,6 +243,26 @@ static void testAudioBookAndThesis() {
     CHECK(thesisOut.str().find("supervisor: Dr. Professor") !=
           std::string::npos);
 }
+static void testHardcoverPricing() {
+    Book paperback(
+        "BP1", "Paperback Book",
+        {"Author"}, "ISBN1", "Publisher",
+        2026, Money::of(100),
+        1, Binding::Paperback
+    );
+
+    Book hardcover(
+        "BH1", "Hardcover Book",
+        {"Author"}, "ISBN2", "Publisher",
+        2026, Money::of(100),
+        1, Binding::Hardcover
+    );
+
+    CHECK(paperback.costFor(3) == Money::of(300));
+    CHECK(hardcover.costFor(3) == Money::of(360));
+
+    CHECK_THROWS(hardcover.costFor(0), std::invalid_argument);
+}
 static void testCatalog() {
     Catalog c;
     c.emplace<Book>("B1", "Clean Code", std::vector<std::string>{"M"}, "i", "P", 2008,
@@ -341,6 +361,7 @@ int main() {
     testJournal();
     testEBook();
     testAudioBookAndThesis();
+    testHardcoverPricing();
     testCatalog();
     testBudget();
     testAcquisition();
