@@ -62,7 +62,7 @@ public:
     void printReport(std::ostream& os) const;
 
 private:
-    PurchaseRecord& record(const Resource* r, const std::string& id, int qty,Money preTaxCost,
+    PurchaseRecord& record(const Resource* r, const std::string& id, int qty, Money preTaxCost,
                            Money cost, bool approved, std::string reason);
 
     Money postTaxCost(const Resource& r, Money preTaxCost) const;
