@@ -95,6 +95,82 @@ const PurchaseRecord& AcquisitionManager::purchase(const std::string& id,
 
     return record(&r, id, quantity, preTaxCost, cost, true, {});
 }
+const PurchaseRecord& AcquisitionManager::cancelOrder(int orderNo) {
+    const PurchaseRecord* target = nullptr;
+
+    for (const auto& rec : history_) {
+        if (rec.orderNo == orderNo) {
+            target = &rec;
+            break;
+        }
+    }
+
+    if (!target) {
+        throw std::invalid_argument("order not found: " +
+                                    std::to_string(orderNo));
+    }
+
+    if (target->cancellation) {
+        throw std::invalid_argument(
+            "cannot cancel a cancellation record"
+        );
+    }
+
+    if (!target->approved) {
+        throw std::invalid_argument(
+            "only approved orders can be cancelled"
+        );
+    }
+
+    for (const auto& rec : history_) {
+        if (rec.cancellation && rec.relatedOrderNo == orderNo) {
+            throw std::invalid_argument(
+                "order has already been cancelled"
+            );
+        }
+    }
+
+    const PurchaseRecord original = *target;
+
+    const Resource* r = catalog_.find(original.resourceId);
+
+    if (!r) {
+        throw NotFoundError(original.resourceId);
+    }
+
+    if (catalog_.holdings(original.resourceId) < original.quantity) {
+        throw std::invalid_argument(
+            "holdings are insufficient to cancel order"
+        );
+    }
+
+    budget_.refund(
+        original.category,
+        original.quantity,
+        original.cost,
+        original.title
+    );
+
+    catalog_.addHoldings(
+        original.resourceId,
+        -original.quantity
+    );
+
+    PurchaseRecord& cancellationRecord = record(
+        r,
+        original.resourceId,
+        original.quantity,
+        Money::fromMinor(-original.preTaxCost.minorUnits()),
+        Money::fromMinor(-original.cost.minorUnits()),
+        true,
+        {}
+    );
+
+    cancellationRecord.cancellation = true;
+    cancellationRecord.relatedOrderNo = orderNo;
+
+    return cancellationRecord;
+}
 
 std::vector<PurchaseRecord> AcquisitionManager::processBatch(
     const std::vector<PurchaseRequest>& reqs) {
@@ -147,15 +223,18 @@ void AcquisitionManager::printReport(std::ostream& os) const {
 
     for (const auto& rec : history_) {
         os << "  #" << std::setw(3) << std::left << rec.orderNo << " "
-           << (rec.approved ? "APPROVED" : "REJECTED") << "  "
+           << (rec.cancellation ? "CANCELLED"  : (rec.approved ? "APPROVED" : "REJECTED"))<< "  "
            << std::setw(6) << rec.resourceId
            << " x" << std::setw(3) << rec.quantity
            << " pre-tax " << rec.preTaxCost.toString()
            << " post-tax " << rec.cost.toString()
            << "  " << rec.title;
 
-        if (!rec.approved)
+         if (rec.cancellation) {
+            os << "\n        cancels order: #" << rec.relatedOrderNo;
+        } else if (!rec.approved) {
             os << "\n        reason: " << rec.reason;
+        }
 
         os << "\n";
     }

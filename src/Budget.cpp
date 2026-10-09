@@ -191,14 +191,104 @@ void Budget::commit(
 
     Usage& u = usage_[c];
 
-    // Count each different title only once per category.
-    if (!title.empty() && titles_[c].insert(title).second) {
-        ++u.titles;
+    if (!title.empty()) {
+        int& activeUnits = titleUnits_[c][title];
+
+        if (activeUnits == 0) {
+            titles_[c].insert(title);
+            ++u.titles;
+        }
+
+        activeUnits += units;
     }
 
     u.units += units;
     u.spent += cost;
     spent_ += cost;
+}
+
+void Budget::refund(
+    ResourceCategory c,
+    int units,
+    Money cost,
+    const std::string& title
+) {
+    if (units <= 0) {
+        throw std::invalid_argument("refund quantity must be positive");
+    }
+
+    if (cost.isNegative()) {
+        throw std::invalid_argument("refund cost must not be negative");
+    }
+
+    const Usage current = usageFor(c);
+
+    if (units > current.units) {
+        throw std::invalid_argument("refund units exceed recorded units");
+    }
+
+    if (cost > current.spent || cost > spent_) {
+        throw std::invalid_argument("refund cost exceeds recorded spending");
+    }
+
+    auto categoryIt = titleUnits_.end();
+    auto titleIt = std::map<std::string, int>::iterator{};
+
+    if (!title.empty()) {
+        categoryIt = titleUnits_.find(c);
+
+        if (categoryIt == titleUnits_.end()) {
+            throw std::invalid_argument("title has no active purchases");
+        }
+
+        titleIt = categoryIt->second.find(title);
+
+        if (titleIt == categoryIt->second.end() ||
+            units > titleIt->second) {
+            throw std::invalid_argument(
+                "refund units exceed active units for title"
+            );
+        }
+    } else {
+        const auto trackedTitles = titleUnits_.find(c);
+
+        if (trackedTitles != titleUnits_.end() &&
+            !trackedTitles->second.empty()) {
+            throw std::invalid_argument(
+                "title must be provided to refund a title-tracked purchase"
+            );
+        }
+    }
+
+    Usage& u = usage_[c];
+
+    u.units -= units;
+    u.spent -= cost;
+    spent_ -= cost;
+
+    if (!title.empty()) {
+        titleIt->second -= units;
+
+        if (titleIt->second == 0) {
+            categoryIt->second.erase(titleIt);
+
+            auto titlesIt = titles_.find(c);
+
+            if (titlesIt != titles_.end()) {
+                if (titlesIt->second.erase(title) > 0) {
+                    --u.titles;
+                }
+
+                if (titlesIt->second.empty()) {
+                    titles_.erase(titlesIt);
+                }
+            }
+
+            if (categoryIt->second.empty()) {
+                titleUnits_.erase(categoryIt);
+            }
+        }
+    }
 }
 
 void Budget::print(std::ostream& os) const {

@@ -571,6 +571,63 @@ static void testTitleQuota() {
     CHECK(c.holdings("B4") == 0);
 }
 
+static void testCancelOrder() {
+    Catalog c;
+
+    c.emplace<Book>(
+        "B1", "Clean Code",
+        std::vector<std::string>{"Author"},
+        "ISBN1", "Publisher", 2020, Money::of(100)
+    );
+
+    c.emplace<Book>(
+        "B2", "Design Patterns",
+        std::vector<std::string>{"Author"},
+        "ISBN2", "Publisher", 2021, Money::of(100)
+    );
+
+    Budget b(Money::of(1000));
+    b.setQuota(ResourceCategory::Book, {10, Money::of(1000), 1});
+
+    AcquisitionManager acq(c, b);
+
+    const int originalOrderNo = acq.purchase("B1", 2).orderNo;
+
+    auto rejected = acq.processBatch({{"B2", 1}});
+    CHECK(rejected.size() == 1);
+    CHECK(!rejected[0].approved);
+
+    const auto& cancellation = acq.cancelOrder(originalOrderNo);
+
+    CHECK(cancellation.cancellation);
+    CHECK(cancellation.relatedOrderNo == originalOrderNo);
+    CHECK(cancellation.cost == Money::of(-200));
+    CHECK(cancellation.preTaxCost == Money::of(-200));
+
+    CHECK(acq.history().size() == 3);
+    CHECK(acq.history()[0].approved);
+    CHECK(!acq.history()[0].cancellation);
+    CHECK(!acq.history()[1].approved);
+    CHECK(acq.history()[2].cancellation);
+
+    CHECK(b.spent() == Money{});
+    CHECK(b.usageFor(ResourceCategory::Book).units == 0);
+    CHECK(b.usageFor(ResourceCategory::Book).titles == 0);
+    CHECK(c.holdings("B1") == 0);
+    CHECK(acq.totalSpent() == Money{});
+
+    CHECK_THROWS(acq.cancelOrder(originalOrderNo), std::invalid_argument);
+    CHECK_THROWS(acq.cancelOrder(2), std::invalid_argument);
+    CHECK_THROWS(acq.cancelOrder(999), std::invalid_argument);
+
+    CHECK(acq.canPurchase("B2", 1));
+    acq.purchase("B2", 1);
+
+    CHECK(b.usageFor(ResourceCategory::Book).titles == 1);
+    CHECK(b.spent() == Money::of(100));
+    CHECK(c.holdings("B2") == 1);
+}
+
 static void testAcquisition() {
     Catalog c;
     c.emplace<Book>("B1", "Book", std::vector<std::string>{"A"}, "i", "P", 2020,
@@ -621,6 +678,7 @@ int main() {
     testCatalog();
     testBudget();
     testTitleQuota();
+    testCancelOrder();
     testAcquisition();
     std::cout << (g_checks - g_failures) << "/" << g_checks << " checks passed\n";
     return g_failures == 0 ? 0 : 1;

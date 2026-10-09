@@ -266,5 +266,39 @@ if (!thirdTitleAllowed) {
 
 titleBudget.print(std::cout);
 
+
+    std::cout << "\n=== Order Cancellation Demo ===\n";
+
+    Catalog cancelCatalog;
+
+    cancelCatalog.emplace<Book>(
+        "C001", "Cancellation Demo Book",
+        std::vector<std::string>{"Author"},
+        "ISBN-C001", "Publisher", 2026, Money::of(100)
+    );
+
+    Budget cancelBudget(Money::of(1000));
+    cancelBudget.setQuota(
+        ResourceCategory::Book,
+        {5, Money::of(1000), 2}
+    );
+
+    AcquisitionManager cancelAcq(cancelCatalog, cancelBudget);
+
+    const int cancelOrderNo = cancelAcq.purchase("C001", 2).orderNo;
+
+    cancelAcq.cancelOrder(cancelOrderNo);
+    cancelAcq.printReport(std::cout);
+
+    std::cout << "Budget spent after cancellation: "
+              << cancelBudget.spent() << "\n";
+
+    std::cout << "Holdings after cancellation: "
+              << cancelCatalog.holdings("C001") << " copies\n";
+
+    std::cout << "Book titles used after cancellation: "
+              << cancelBudget.usageFor(ResourceCategory::Book).titles
+              << "/2\n";
+
 return 0;
 }

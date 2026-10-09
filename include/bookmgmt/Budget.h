@@ -54,6 +54,9 @@ public:
     void commit(ResourceCategory c, int units, Money cost,
                 const std::string& title = {});
 
+        // Refunds a previously recorded purchase from the budget.
+    void refund(ResourceCategory c, int units, Money cost,
+                const std::string& title = {});
     void print(std::ostream& os) const;
 
 private:
@@ -67,6 +70,7 @@ private:
     std::map<ResourceCategory, Quota> quotas_;
     std::map<ResourceCategory, Usage> usage_;
     std::map<ResourceCategory, std::set<std::string>> titles_;
+    std::map<ResourceCategory, std::map<std::string, int>> titleUnits_;
 };
 
 }  // namespace bookmgmt

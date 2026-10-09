@@ -29,6 +29,8 @@ struct PurchaseRecord {
 
     bool approved;
     std::string reason;
+    bool cancellation = false;
+    int relatedOrderNo = 0;
 };
 
 class AcquisitionManager {
@@ -45,7 +47,9 @@ public:
     // True if the purchase would be approved; if not, `reason` explains why.
     bool canPurchase(const std::string& id, int quantity,
                      std::string* reason = nullptr) const;
-
+    // Cancels an approved order and appends a cancellation record.
+    // The original purchase record is preserved.
+    const PurchaseRecord& cancelOrder(int orderNo);
     // Buys immediately. Throws NotFoundError, QuotaExceededError,
     // BudgetExceededError or std::invalid_argument. On success the budget
     // and holdings are updated and the record is added to history.
