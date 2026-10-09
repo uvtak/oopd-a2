@@ -135,6 +135,13 @@ static void testMagazine() {
     // Postage = 10 × 52 × 2 × 2 = 2080
     // Total = 4080
     CHECK(m.costFor(2) == Money::of(4080));
+    // 10 copies:
+    // Subscription = 500 × 10 × 2 = 10000
+    // 10% bulk discount = 9000
+    // Postage = 10 × 52 × 10 × 2 = 10400
+    // Total = 19400
+    
+    CHECK(m.costFor(10) == Money::of(19400));
 
     CHECK_THROWS(m.costFor(0), std::invalid_argument);
 
@@ -429,7 +436,8 @@ static void testTaxes() {
     CHECK(report.str().find("post-tax 220.00") != std::string::npos);
     CHECK(report.str().find("pre-tax 250.00") != std::string::npos);
     CHECK(report.str().find("post-tax 300.00") != std::string::npos);
-
+    CHECK(report.str().find("Total pre-tax: 450.00") != std::string::npos);
+    CHECK(report.str().find("Total post-tax: 520.00") != std::string::npos);
     // Budget spent must use post-tax amounts.
     CHECK(b.spent() == Money::of(520));
 

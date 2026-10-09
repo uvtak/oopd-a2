@@ -125,7 +125,7 @@ catalog.emplace<Thesis>(
     // Direct purchase: errors are reported with exceptions
 std::cout << "\n=== Direct purchase that breaks a quota ===\n";
 try {
-    acq.purchase("B002", 1);
+    acq.purchase("B002", 5);
 } catch (const QuotaExceededError& e) {
     std::cout << "QuotaExceededError: " << e.what() << "\n";
 }

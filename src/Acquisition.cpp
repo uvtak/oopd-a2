@@ -160,7 +160,17 @@ void AcquisitionManager::printReport(std::ostream& os) const {
         os << "\n";
     }
 
-    os << "Total spent: " << totalSpent() << "\n";
+Money totalPreTax;
+
+for (const auto& rec : history_) {
+    if (rec.approved) {
+        totalPreTax += rec.preTaxCost;
+    }
+}
+
+os << "Total pre-tax: " << totalPreTax << "\n";
+os << "Total post-tax: " << totalSpent() << "\n";
+os << "Total spent: " << totalSpent() << "\n";
 }
 
 }  // namespace bookmgmt
