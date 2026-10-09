@@ -7,6 +7,7 @@
 #include <iosfwd>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 
 #include "bookmgmt/Money.h"
@@ -17,11 +18,13 @@ namespace bookmgmt {
 struct Quota {
     int maxUnits;    // maximum copies/seats that may be bought
     Money maxSpend;  // maximum money that may be spent
+    std::optional<int> maxTitles = std::nullopt;
 };
 
 struct Usage {
     int units = 0;
     Money spent;
+    int titles = 0;
 };
 
 class Budget {
@@ -43,22 +46,27 @@ public:
 
     // Returns an empty string if the purchase fits, otherwise the reason it
     // does not. Does not change state.
-    std::string check(ResourceCategory c, int units, Money cost) const;
+    std::string check(ResourceCategory c, int units, Money cost,
+                      const std::string& title = {}) const;
 
     // Records a purchase. Throws QuotaExceededError / BudgetExceededError
     // (and changes nothing) if it would not fit.
-    void commit(ResourceCategory c, int units, Money cost);
+    void commit(ResourceCategory c, int units, Money cost,
+                const std::string& title = {});
 
     void print(std::ostream& os) const;
 
 private:
     enum class Failure { None, BadInput, Quota, Overall };
-    Failure evaluate(ResourceCategory c, int units, Money cost, std::string& why) const;
+
+    Failure evaluate(ResourceCategory c, int units, Money cost,
+                     const std::string& title, std::string& why) const;
 
     Money total_;
     Money spent_;
     std::map<ResourceCategory, Quota> quotas_;
     std::map<ResourceCategory, Usage> usage_;
+    std::map<ResourceCategory, std::set<std::string>> titles_;
 };
 
 }  // namespace bookmgmt

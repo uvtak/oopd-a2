@@ -207,5 +207,64 @@ taxAcq.printReport(std::cout);
 std::cout << "\n=== Tax Budget ===\n";
 taxBudget.print(std::cout);
 
+
+/*
+ * Q8: Limit the number of different titles bought per category.
+ */
+std::cout << "\n=== Title Quota Demo ===\n";
+
+Catalog titleCatalog;
+
+titleCatalog.emplace<Book>(
+    "Q8B1", "Clean Code",
+    std::vector<std::string>{"Author"},
+    "ISBN-Q8-1", "Publisher", 2026, Money::of(100)
+);
+
+titleCatalog.emplace<Book>(
+    "Q8B2", "Design Patterns",
+    std::vector<std::string>{"Author"},
+    "ISBN-Q8-2", "Publisher", 2026, Money::of(100)
+);
+
+titleCatalog.emplace<Book>(
+    "Q8B3", "Effective C++",
+    std::vector<std::string>{"Author"},
+    "ISBN-Q8-3", "Publisher", 2026, Money::of(100)
+);
+
+// At most 2 different titles in the Book category.
+Budget titleBudget(Money::of(1000));
+titleBudget.setQuota(
+    ResourceCategory::Book,
+    {10, Money::of(1000), 2}
+);
+
+AcquisitionManager titleAcq(titleCatalog, titleBudget);
+
+// Buying the same title twice counts as one distinct title.
+titleAcq.purchase("Q8B1", 1);
+titleAcq.purchase("Q8B1", 1);
+
+// A second distinct title is allowed.
+titleAcq.purchase("Q8B2", 1);
+
+std::string titleReason;
+const bool thirdTitleAllowed =
+    titleAcq.canPurchase("Q8B3", 1, &titleReason);
+
+std::cout << "Different titles used: "
+          << titleBudget.usageFor(ResourceCategory::Book).titles
+          << "/2\n";
+
+std::cout << "Can buy the third different title? "
+          << (thirdTitleAllowed ? "Yes" : "No") << "\n";
+
+if (!thirdTitleAllowed) {
+    std::cout << "Reason: " << titleReason << "\n";
+}
+
+titleBudget.print(std::cout);
+
 return 0;
 }

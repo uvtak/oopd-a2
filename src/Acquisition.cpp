@@ -4,7 +4,7 @@
 #include <iomanip>
 #include <ostream>
 #include <stdexcept>
-
+#include <utility>
 #include "bookmgmt/Exceptions.h"
 
 namespace bookmgmt {
@@ -49,7 +49,7 @@ bool AcquisitionManager::canPurchase(const std::string& id, int quantity,
             const Money preTaxCost = r->costFor(quantity);
             const Money cost = postTaxCost(*r, preTaxCost);
 
-            why = budget_.check(r->category(), quantity, cost);
+           why = budget_.check(r->category(), quantity, cost, r->title());
         }
     } else {
         why = "resource not found: " + id;
@@ -90,7 +90,7 @@ const PurchaseRecord& AcquisitionManager::purchase(const std::string& id,
     const Money preTaxCost = r.costFor(quantity);
     const Money cost = postTaxCost(r, preTaxCost);
 
-    budget_.commit(r.category(), quantity, cost);
+    budget_.commit(r.category(), quantity, cost, r.title());
     catalog_.addHoldings(id, quantity);
 
     return record(&r, id, quantity, preTaxCost, cost, true, {});
@@ -115,7 +115,7 @@ std::vector<PurchaseRecord> AcquisitionManager::processBatch(
         } else {
             preTaxCost = r->costFor(req.quantity);
             cost = postTaxCost(*r, preTaxCost);
-            why = budget_.check(r->category(), req.quantity, cost);
+            why = budget_.check(r->category(), req.quantity, cost, r->title());
         }
 
         if (why.empty()) {

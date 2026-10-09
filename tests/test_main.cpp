@@ -140,7 +140,7 @@ static void testMagazine() {
     // 10% bulk discount = 9000
     // Postage = 10 × 52 × 10 × 2 = 10400
     // Total = 19400
-    
+
     CHECK(m.costFor(10) == Money::of(19400));
 
     CHECK_THROWS(m.costFor(0), std::invalid_argument);
@@ -499,6 +499,78 @@ static void testBudget() {
     CHECK(b.spent() == Money::of(300));  // failed commits changed nothing
 }
 
+static void testTitleQuota() {
+    Catalog c;
+
+    c.emplace<Book>(
+        "B1", "Clean Code",
+        std::vector<std::string>{"Author"},
+        "ISBN1", "Publisher", 2020, Money::of(100)
+    );
+
+    // Different ID, but the same title.
+    c.emplace<Book>(
+        "B2", "Clean Code",
+        std::vector<std::string>{"Author"},
+        "ISBN2", "Publisher", 2021, Money::of(100)
+    );
+
+    c.emplace<Book>(
+        "B3", "The Pragmatic Programmer",
+        std::vector<std::string>{"Author"},
+        "ISBN3", "Publisher", 2022, Money::of(100)
+    );
+
+    c.emplace<Book>(
+        "B4", "Design Patterns",
+        std::vector<std::string>{"Author"},
+        "ISBN4", "Publisher", 2023, Money::of(100)
+    );
+
+    Budget b(Money::of(1000));
+
+    // Maximum 10 units, 1000 spending, and 2 different titles.
+    b.setQuota(ResourceCategory::Book,
+               {10, Money::of(1000), 2});
+
+    AcquisitionManager acq(c, b);
+
+    // First title is allowed.
+    CHECK(acq.canPurchase("B1", 1));
+    acq.purchase("B1", 1);
+
+    CHECK(b.usageFor(ResourceCategory::Book).titles == 1);
+
+    // Same title with a different ID should still be allowed.
+    CHECK(acq.canPurchase("B2", 1));
+    acq.purchase("B2", 1);
+
+    CHECK(b.usageFor(ResourceCategory::Book).titles == 1);
+
+    // Second different title is allowed.
+    CHECK(acq.canPurchase("B3", 1));
+    acq.purchase("B3", 1);
+
+    CHECK(b.usageFor(ResourceCategory::Book).titles == 2);
+
+    // Third different title must be rejected.
+    std::string why;
+    CHECK(!acq.canPurchase("B4", 1, &why));
+    CHECK(why.find("title quota") != std::string::npos);
+
+    auto results = acq.processBatch({{"B4", 1}});
+
+    CHECK(results.size() == 1);
+    CHECK(!results[0].approved);
+    CHECK(results[0].reason.find("title quota") != std::string::npos);
+
+    // Rejected purchase must not change budget, units, or holdings.
+    CHECK(b.usageFor(ResourceCategory::Book).titles == 2);
+    CHECK(b.usageFor(ResourceCategory::Book).units == 3);
+    CHECK(b.spent() == Money::of(300));
+    CHECK(c.holdings("B4") == 0);
+}
+
 static void testAcquisition() {
     Catalog c;
     c.emplace<Book>("B1", "Book", std::vector<std::string>{"A"}, "i", "P", 2020,
@@ -548,6 +620,7 @@ int main() {
     testTaxes();
     testCatalog();
     testBudget();
+    testTitleQuota();
     testAcquisition();
     std::cout << (g_checks - g_failures) << "/" << g_checks << " checks passed\n";
     return g_failures == 0 ? 0 : 1;
