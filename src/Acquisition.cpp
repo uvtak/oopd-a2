@@ -127,7 +127,7 @@ Money AcquisitionManager::postTaxCost(const Resource& r, Money preTaxCost) const
     const std::int64_t taxMinor =
         (preTaxCost.minorUnits() * rate) / 100;
 
-    return Money::fromMinor(preTaxCost.minorUnits() + taxMinor);
+    return Money::fromMinor(preTaxCost.minorUnits() + taxMinor, preTaxCost.currencyCode());
 }
 
 Money AcquisitionManager::quote(
@@ -333,8 +333,8 @@ const PurchaseRecord& AcquisitionManager::cancelOrder(int orderNo) {
         r,
         original.resourceId,
         original.quantity,
-        Money::fromMinor(-original.preTaxCost.minorUnits()),
-        Money::fromMinor(-original.cost.minorUnits()),
+        Money::fromMinor(-original.preTaxCost.minorUnits(), original.preTaxCost.currencyCode()),
+        Money::fromMinor(-original.cost.minorUnits(), original.cost.currencyCode()),
         true,
         {},
         original.department,
@@ -548,16 +548,29 @@ std::vector<PurchaseRecord> AcquisitionManager::processBatch(
     return results;
 }
 
+
 Money AcquisitionManager::totalSpent() const {
-    Money sum;
+    Money sum = Money::fromMinor(
+        0, budget_.total().currencyCode()
+    );
+    bool initialized = false;
 
     for (const auto& rec : history_) {
-        if (rec.approved)
+        if (rec.approved) {
+            if (!initialized) {
+                sum = Money::fromMinor(
+                    0, rec.cost.currencyCode()
+                );
+                initialized = true;
+            }
+
             sum += rec.cost;
+        }
     }
 
     return sum;
 }
+
 
 void AcquisitionManager::printReport(std::ostream& os) const {
     os << "Order history (" << history_.size() << " orders)\n";
@@ -586,13 +599,25 @@ void AcquisitionManager::printReport(std::ostream& os) const {
         os << "\n";
     }
 
-    Money totalPreTax;
+   
+Money totalPreTax = Money::fromMinor(
+    0, budget_.total().currencyCode()
+);
+bool initialized = false;
 
-    for (const auto& rec : history_) {
-        if (rec.approved) {
-            totalPreTax += rec.preTaxCost;
+for (const auto& rec : history_) {
+    if (rec.approved) {
+        if (!initialized) {
+            totalPreTax = Money::fromMinor(
+                0, rec.preTaxCost.currencyCode()
+            );
+            initialized = true;
         }
+
+        totalPreTax += rec.preTaxCost;
     }
+}
+
 
     os << "Total pre-tax: " << totalPreTax << "\n";
     os << "Total post-tax: " << totalSpent() << "\n";

@@ -54,7 +54,7 @@ Money Resource::costForAtPrice(int quantity, Money price) const {
 
     if (quantity >= 10) {
         // 10% bulk discount for print resources.
-        return Money::fromMinor((total.minorUnits() * 9) / 10);
+        return Money::fromMinor((total.minorUnits() * 9) / 10, total.currencyCode());
     }
 
     return total;

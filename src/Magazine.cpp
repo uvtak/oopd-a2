@@ -38,7 +38,7 @@ Money Magazine::costForAtPrice(int copies, Money price) const {
     const Money total = subscriptionCost + postage;
 
     if (copies >= 10) {
-        return Money::fromMinor((total.minorUnits() * 9) / 10);
+        return Money::fromMinor((total.minorUnits() * 9) / 10, total.currencyCode());
     }
 
     return total;

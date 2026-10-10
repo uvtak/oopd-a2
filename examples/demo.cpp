@@ -2,6 +2,7 @@
 // and runs a batch of purchase requests through the acquisition manager.
 
 #include <iostream>
+#include <stdexcept>
 
 #include "bookmgmt/bookmgmt.h"
 
@@ -613,6 +614,64 @@ lending.closeSession("P001", "L-R1");
 
 std::cout << "Available database seats after closing P001's session: "
           << lending.availableSeats("L-R1") << "\n";
+
+
+    // Official PDF Q15: Currency-aware Money.
+    std::cout << "\n=== Official PDF Q15: Currency Support ===\n";
+
+    Catalog currencyCatalog;
+
+    currencyCatalog.emplace<Book>(
+        "USD-B1", "USD Demo Book",
+        std::vector<std::string>{"Author"},
+        "ISBN-USD", "Publisher", 2026,
+        Money::of(100, 0, "USD")
+    );
+
+    Budget currencyBudget(
+        Money::of(1000, 0, "USD")
+    );
+
+    currencyBudget.setQuota(
+        ResourceCategory::Book,
+        {10, Money::of(800, 0, "USD")}
+    );
+
+    AcquisitionManager currencyAcq(
+        currencyCatalog, currencyBudget
+    );
+
+    currencyAcq.setTaxRates(10, 20);
+
+    const auto& usdOrder = currencyAcq.purchase("USD-B1", 2);
+
+    std::cout << "Purchase currency: "
+              << usdOrder.cost.currencyCode() << "\n";
+
+    std::cout << "Pre-tax cost: "
+              << usdOrder.preTaxCost.currencyCode() << " "
+              << usdOrder.preTaxCost << "\n";
+
+    std::cout << "Cost after 10% tax: "
+              << usdOrder.cost.currencyCode() << " "
+              << usdOrder.cost << "\n";
+
+    std::cout << "Budget spent: "
+              << currencyBudget.spent().currencyCode() << " "
+              << currencyBudget.spent() << "\n";
+
+    try {
+        (void)(Money::of(1, 0, "USD")
+               + Money::of(1, 0, "INR"));
+    } catch (const std::invalid_argument& error) {
+        std::cout << "Mixed currencies rejected: "
+                  << error.what() << "\n";
+    }
+
+    std::cout << "Currency-aware acquisition report:\n";
+    currencyAcq.printReport(std::cout);
+
+
 
 return 0;
 }

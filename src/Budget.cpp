@@ -31,7 +31,7 @@ bool passesEightyPercent(long double used, long double limit) {
 
 }
 
-Budget::Budget(Money total) : total_(total) {
+Budget::Budget(Money total) : total_(total), spent_(Money::fromMinor(0, total.currencyCode())) {
     if (total_.isNegative()) {
         throw std::invalid_argument("budget must not be negative");
     }
@@ -64,7 +64,15 @@ std::optional<Quota> Budget::quotaFor(ResourceCategory c) const {
 Usage Budget::usageFor(ResourceCategory c) const {
     auto it = usage_.find(c);
 
-    return it == usage_.end() ? Usage{} : it->second;
+    if (it != usage_.end()) {
+        return it->second;
+    }
+
+    return Usage{
+        0,
+        Money::fromMinor(0, total_.currencyCode()),
+        0
+    };
 }
 
 std::optional<int> Budget::unitsRemaining(ResourceCategory c) const {
@@ -197,8 +205,20 @@ void Budget::commit(
             throw BudgetExceededError(why);
     }
 
-    Usage& u = usage_[c];
+    auto usageIt = usage_.find(c);
 
+if (usageIt == usage_.end()) {
+    usageIt = usage_.emplace(
+        c,
+        Usage{
+            0,
+            Money::fromMinor(0, total_.currencyCode()),
+            0
+        }
+    ).first;
+}
+
+Usage& u = usageIt->second;
     if (!title.empty()) {
         int& activeUnits = titleUnits_[c][title];
 

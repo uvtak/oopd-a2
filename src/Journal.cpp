@@ -31,7 +31,7 @@ Money Journal::costForAtPrice(int copies, Money price) const {
     Money total = price * copies * subscriptionYears_;
 
     if (copies >= 10) {
-        return Money::fromMinor((total.minorUnits() * 9) / 10);
+        return Money::fromMinor((total.minorUnits() * 9) / 10, total.currencyCode());
     }
 
     return total;

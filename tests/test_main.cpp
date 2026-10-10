@@ -42,6 +42,97 @@ static void testMoney() {
     CHECK(Money::of(3) * 4 == Money::of(12));
     CHECK(Money::of(1) < Money::of(2));
     CHECK_THROWS(Money::of(1, 100), std::invalid_argument);
+    
+    // Q15: Currency support.
+    CHECK(Money::of(12, 50, "USD").currencyCode() == "USD");
+    CHECK(Money::fromMinor(150, "usd").currencyCode() == "USD");
+
+    // Arithmetic and comparisons work within the same currency.
+    CHECK(
+        Money::of(1, 0, "USD") + Money::of(2, 0, "USD")
+        == Money::of(3, 0, "USD")
+    );
+
+    CHECK(
+        (Money::of(2, 0, "USD") * 3).currencyCode() == "USD"
+    );
+
+    // Different currencies must throw exceptions.
+    CHECK_THROWS(
+        Money::of(1, 0, "USD") + Money::of(1, 0, "INR"),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        Money::of(2, 0, "USD") - Money::of(1, 0, "INR"),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        Money::of(1, 0, "USD") == Money::of(1, 0, "INR"),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        Money::of(1, 0, "USD") < Money::of(2, 0, "INR"),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        Money::of(1, 0, ""),
+        std::invalid_argument
+    );
+
+}
+
+static void testCurrencyAwarePurchases() {
+    Catalog c;
+
+    c.emplace<Book>(
+        "USD-B1", "USD Book",
+        std::vector<std::string>{"Author"},
+        "ISBN-USD", "Publisher", 2026,
+        Money::of(100, 0, "USD")
+    );
+
+    Budget b(Money::of(1000, 0, "USD"));
+
+    b.setQuota(
+        ResourceCategory::Book,
+        {10, Money::of(800, 0, "USD")}
+    );
+
+    AcquisitionManager acq(c, b);
+    acq.setTaxRates(10, 20);
+
+    const auto& order = acq.purchase("USD-B1", 2);
+    const int orderNo = order.orderNo;
+
+    CHECK(order.preTaxCost == Money::of(200, 0, "USD"));
+    CHECK(order.cost == Money::of(220, 0, "USD"));
+    CHECK(b.spent() == Money::of(220, 0, "USD"));
+
+    CHECK(
+        b.usageFor(ResourceCategory::Book).spent
+        == Money::of(220, 0, "USD")
+    );
+
+    CHECK(acq.totalSpent() == Money::of(220, 0, "USD"));
+
+    std::ostringstream report;
+    acq.printReport(report);
+
+    CHECK(
+        report.str().find("Total spent: 220.00")
+        != std::string::npos
+    );
+
+    const auto& cancellation = acq.cancelOrder(orderNo);
+
+    CHECK(cancellation.cost == Money::of(-220, 0, "USD"));
+    CHECK(b.spent() == Money::of(0, 0, "USD"));
+    CHECK(acq.totalSpent() == Money::of(0, 0, "USD"));
+    CHECK(c.holdings("USD-B1") == 0);
 }
 
 static void testResourcesAndCost() {
@@ -1224,6 +1315,7 @@ static void testAcquisition() {
 
 int main() {
     testMoney();
+    testCurrencyAwarePurchases();
     testResourcesAndCost();
     testJournal();
     testMagazine();

@@ -33,7 +33,7 @@ Money Book::costForAtPrice(int quantity, Money price) const {
 
     if (binding_ == Binding::Hardcover) {
         // Hardcover costs 20% more.
-        return Money::fromMinor((total.minorUnits() * 6) / 5);
+        return Money::fromMinor((total.minorUnits() * 6) / 5, total.currencyCode());
     }
 
     return total;
