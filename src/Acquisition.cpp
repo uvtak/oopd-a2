@@ -240,7 +240,144 @@ const PurchaseRecord& AcquisitionManager::cancelOrder(int orderNo) {
 }
 
 std::vector<PurchaseRecord> AcquisitionManager::processBatch(
-    const std::vector<PurchaseRequest>& reqs) {
+    const std::vector<PurchaseRequest>& reqs,
+    bool allOrNothing
+) {
+    if (allOrNothing) {
+        struct PendingRequest {
+            const Resource* resource;
+            PurchaseRequest request;
+            Money preTaxCost;
+            Money cost;
+            std::string reason;
+        };
+
+        std::vector<PendingRequest> pending;
+        pending.reserve(reqs.size());
+
+        // Work with budget copies before changing the real budgets.
+        Budget simulatedDefault = budget_;
+
+        std::map<std::string, Budget> simulatedDepartments;
+
+        for (const auto& entry : departments_) {
+            simulatedDepartments.emplace(
+                entry.first, *entry.second
+            );
+        }
+
+        std::size_t firstRejected = reqs.size();
+
+        // Check the entire batch in order.
+        for (std::size_t i = 0; i < reqs.size(); ++i) {
+            const PurchaseRequest& req = reqs[i];
+            const Resource* r = catalog_.find(req.resourceId);
+
+            Money preTaxCost;
+            Money cost;
+            std::string why;
+
+            if (!r) {
+                why = "resource not found: " + req.resourceId;
+            } else if (req.quantity <= 0) {
+                why = "quantity must be positive";
+            } else {
+                preTaxCost = r->costFor(req.quantity);
+                cost = postTaxCost(*r, preTaxCost);
+
+                Budget* selectedBudget = nullptr;
+
+                if (req.department.empty()) {
+                    selectedBudget = &simulatedDefault;
+                } else {
+                    auto it = simulatedDepartments.find(
+                        req.department
+                    );
+
+                    if (it != simulatedDepartments.end()) {
+                        selectedBudget = &it->second;
+                    }
+                }
+
+                if (!selectedBudget) {
+                    why = "department not found: " +
+                          req.department;
+                } else {
+                    why = selectedBudget->check(
+                        r->category(),
+                        req.quantity,
+                        cost,
+                        r->title()
+                    );
+
+                    // Update only the simulated budget.
+                    if (why.empty()) {
+                        selectedBudget->commit(
+                            r->category(),
+                            req.quantity,
+                            cost,
+                            r->title()
+                        );
+                    }
+                }
+            }
+
+            if (!why.empty() &&
+                firstRejected == reqs.size()) {
+                firstRejected = i;
+            }
+
+            pending.push_back(PendingRequest{
+                r, req, preTaxCost, cost, std::move(why)
+            });
+        }
+
+        std::vector<PurchaseRecord> results;
+        results.reserve(reqs.size());
+
+        // If any request fails, reject the entire batch.
+        if (firstRejected != reqs.size()) {
+            const std::string abortReason =
+                "batch aborted because request " +
+                std::to_string(firstRejected + 1) +
+                " would be rejected";
+
+            for (const auto& item : pending) {
+                std::string reason = item.reason;
+
+                if (reason.empty()) {
+                    reason = abortReason;
+                }
+
+                results.push_back(record(
+                    item.resource,
+                    item.request.resourceId,
+                    item.request.quantity,
+                    item.preTaxCost,
+                    item.cost,
+                    false,
+                    std::move(reason),
+                    item.request.department
+                ));
+            }
+
+            return results;
+        }
+
+        // All requests passed preflight.
+        // Now perform the actual purchases.
+        for (const auto& req : reqs) {
+            results.push_back(purchase(
+                req.resourceId,
+                req.quantity,
+                req.department
+            ));
+        }
+
+        return results;
+    }
+
+    // Existing behaviour: process each request independently.
     std::vector<PurchaseRecord> results;
     results.reserve(reqs.size());
 
@@ -264,17 +401,34 @@ std::vector<PurchaseRecord> AcquisitionManager::processBatch(
                 why = "department not found: " + req.department;
             } else {
                 why = selectedBudget->check(
-                    r->category(), req.quantity, cost, r->title());
+                    r->category(),
+                    req.quantity,
+                    cost,
+                    r->title()
+                );
             }
         }
 
         if (why.empty()) {
             results.push_back(
-                purchase(req.resourceId, req.quantity, req.department));
+                purchase(
+                    req.resourceId,
+                    req.quantity,
+                    req.department
+                )
+            );
         } else {
             results.push_back(
-                record(r, req.resourceId, req.quantity,
-                       preTaxCost, cost, false, why, req.department)
+                record(
+                    r,
+                    req.resourceId,
+                    req.quantity,
+                    preTaxCost,
+                    cost,
+                    false,
+                    why,
+                    req.department
+                )
             );
         }
     }

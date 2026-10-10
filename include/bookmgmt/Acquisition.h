@@ -61,9 +61,12 @@ public:
     const PurchaseRecord& purchase(const std::string& id, int quantity,
                                    const std::string& department);
 
-    std::vector<PurchaseRecord> processBatch(
-        const std::vector<PurchaseRequest>& reqs
-    );
+// Official PDF Q11: All-or-nothing batch processing.
+// If any request is rejected, no purchase is made.
+std::vector<PurchaseRecord> processBatch(
+    const std::vector<PurchaseRequest>& reqs,
+    bool allOrNothing = false
+);
 
     const std::vector<PurchaseRecord>& history() const { return history_; }
 

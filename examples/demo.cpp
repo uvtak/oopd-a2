@@ -411,6 +411,49 @@ titleBudget.print(std::cout);
     );
 
     warningBudget.print(std::cout);
+std::cout
+    << "\n=== Official PDF Q11: All-or-nothing Batch ===\n";
 
+Catalog atomicCatalog;
+
+atomicCatalog.emplace<Book>(
+    "AB1", "First Atomic Book",
+    std::vector<std::string>{"Author"},
+    "ISBN-AB1", "Publisher", 2026, Money::of(100)
+);
+atomicCatalog.emplace<Book>(
+    "AB2", "Second Atomic Book",
+    std::vector<std::string>{"Author"},
+    "ISBN-AB2", "Publisher", 2026, Money::of(100)
+);
+
+Budget atomicBudget(Money::of(1000));
+atomicBudget.setQuota(
+    ResourceCategory::Book,
+    {10, Money::of(250)}
+);
+
+AcquisitionManager atomicAcq(
+    atomicCatalog, atomicBudget
+);
+
+auto atomicResults = atomicAcq.processBatch(
+    {{"AB1", 1}, {"AB2", 2}},
+    true
+);
+
+atomicAcq.printReport(std::cout);
+
+std::cout
+    << "Budget spent after batch: "
+    << atomicBudget.spent() << "\n";
+
+std::cout
+    << "First book holdings: "
+    << atomicCatalog.holdings("AB1") << "\n";
+
+std::cout
+    << "Second book holdings: "
+    << atomicCatalog.holdings("AB2") << "\n";
 return 0;
 }
