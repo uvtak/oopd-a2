@@ -1,8 +1,7 @@
 #pragma once
-// AcquisitionManager: turns purchase requests into orders, enforcing the
-// Budget's quotas, updating Catalog holdings and keeping an order history.
 
 #include <iosfwd>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -13,7 +12,8 @@ namespace bookmgmt {
 
 struct PurchaseRequest {
     std::string resourceId;
-    int quantity;  // copies for print, seats for electronic
+    int quantity;
+    std::string department{};
 };
 
 struct PurchaseRecord {
@@ -23,12 +23,12 @@ struct PurchaseRecord {
     ResourceCategory category;
     int quantity;
 
-    // Cost before and after tax.
     Money preTaxCost;
-    Money cost;  // final/post-tax cost charged to the budget
+    Money cost;
 
     bool approved;
     std::string reason;
+    std::string department;
     bool cancellation = false;
     int relatedOrderNo = 0;
 };
@@ -36,45 +36,60 @@ struct PurchaseRecord {
 class AcquisitionManager {
 public:
     AcquisitionManager(Catalog& catalog, Budget& budget);
-    // Configure tax rates as whole-number percentages.
+
+    void registerDepartment(const std::string& name,
+                            Budget& departmentBudget);
+
     void setTaxRates(int printPercent, int electronicPercent);
 
     int printTaxPercent() const { return printTaxPercent_; }
     int electronicTaxPercent() const { return electronicTaxPercent_; }
-    // Price of a request without buying anything. Throws NotFoundError.
+
     Money quote(const std::string& id, int quantity) const;
 
-    // True if the purchase would be approved; if not, `reason` explains why.
     bool canPurchase(const std::string& id, int quantity,
                      std::string* reason = nullptr) const;
-    // Cancels an approved order and appends a cancellation record.
-    // The original purchase record is preserved.
+
+    bool canPurchase(const std::string& id, int quantity,
+                     const std::string& department,
+                     std::string* reason = nullptr) const;
+
     const PurchaseRecord& cancelOrder(int orderNo);
-    // Buys immediately. Throws NotFoundError, QuotaExceededError,
-    // BudgetExceededError or std::invalid_argument. On success the budget
-    // and holdings are updated and the record is added to history.
+
     const PurchaseRecord& purchase(const std::string& id, int quantity);
 
-    // Processes requests in order; each is approved or rejected on its own
-    // (never throws for a rejected request). Every outcome is recorded.
-    // EXTENSION POINT: priority ordering, all-or-nothing batches, ...
-    std::vector<PurchaseRecord> processBatch(const std::vector<PurchaseRequest>& reqs);
+    const PurchaseRecord& purchase(const std::string& id, int quantity,
+                                   const std::string& department);
+
+    std::vector<PurchaseRecord> processBatch(
+        const std::vector<PurchaseRequest>& reqs
+    );
 
     const std::vector<PurchaseRecord>& history() const { return history_; }
+
     Money totalSpent() const;
 
     void printReport(std::ostream& os) const;
 
 private:
-    PurchaseRecord& record(const Resource* r, const std::string& id, int qty, Money preTaxCost,
-                           Money cost, bool approved, std::string reason);
+    PurchaseRecord& record(const Resource* r, const std::string& id,
+                           int qty, Money preTaxCost, Money cost,
+                           bool approved, std::string reason,
+                           const std::string& department);
+
+    Budget* budgetFor(const std::string& department);
+    const Budget* budgetFor(const std::string& department) const;
 
     Money postTaxCost(const Resource& r, Money preTaxCost) const;
+
     int printTaxPercent_ = 0;
     int electronicTaxPercent_ = 0;
+
     Catalog& catalog_;
     Budget& budget_;
+    std::map<std::string, Budget*> departments_;
     std::vector<PurchaseRecord> history_;
+
     int nextOrderNo_ = 1;
 };
 

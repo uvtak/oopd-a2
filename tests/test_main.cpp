@@ -628,6 +628,115 @@ static void testCancelOrder() {
     CHECK(c.holdings("B2") == 1);
 }
 
+static void testDepartmentBudgets() {
+    Catalog c;
+
+    c.emplace<Book>(
+        "B1", "Clean Code",
+        std::vector<std::string>{"Author"},
+        "ISBN1", "Publisher", 2020, Money::of(100)
+    );
+
+    c.emplace<Book>(
+        "B2", "Physics Book",
+        std::vector<std::string>{"Author"},
+        "ISBN2", "Publisher", 2021, Money::of(100)
+    );
+
+    Budget defaultBudget(Money::of(5000));
+    defaultBudget.setQuota(ResourceCategory::Book,
+                          {10, Money::of(5000)});
+
+    Budget csBudget(Money::of(300));
+    csBudget.setQuota(ResourceCategory::Book,
+                      {5, Money::of(200), 2});
+
+    Budget physicsBudget(Money::of(500));
+    physicsBudget.setQuota(ResourceCategory::Book,
+                           {5, Money::of(400), 2});
+
+    AcquisitionManager acq(c, defaultBudget);
+
+    acq.registerDepartment("Computer Science", csBudget);
+    acq.registerDepartment("Physics", physicsBudget);
+
+    CHECK_THROWS(
+        acq.registerDepartment("Physics", csBudget),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        acq.registerDepartment("Biology", csBudget),
+        std::invalid_argument
+    );
+
+    const int defaultOrderNo = acq.purchase("B1", 1).orderNo;
+
+    CHECK(acq.history().back().department.empty());
+    CHECK(defaultBudget.spent() == Money::of(100));
+
+    CHECK(acq.canPurchase("B1", 2, "Computer Science"));
+
+    const int csOrderNo =
+        acq.purchase("B1", 2, "Computer Science").orderNo;
+
+    CHECK(acq.history().back().department == "Computer Science");
+    CHECK(csBudget.spent() == Money::of(200));
+    CHECK(defaultBudget.spent() == Money::of(100));
+    CHECK(physicsBudget.spent() == Money{});
+
+    std::string why;
+
+    CHECK(!acq.canPurchase("B2", 1, "Computer Science", &why));
+    CHECK(why.find("spend quota") != std::string::npos);
+
+    CHECK(acq.canPurchase("B2", 2, "Physics"));
+
+    const int physicsOrderNo =
+        acq.purchase("B2", 2, "Physics").orderNo;
+
+    CHECK(acq.history().back().department == "Physics");
+    CHECK(physicsBudget.spent() == Money::of(200));
+    CHECK(csBudget.spent() == Money::of(200));
+
+    CHECK(!acq.canPurchase("B1", 1, "Biology", &why));
+    CHECK(why.find("department not found") != std::string::npos);
+
+    auto results = acq.processBatch({
+        {"B1", 1, "Physics"},
+        {"B2", 1, "Biology"}
+    });
+
+    CHECK(results.size() == 2);
+    CHECK(results[0].approved);
+    CHECK(results[0].department == "Physics");
+    CHECK(!results[1].approved);
+    CHECK(results[1].department == "Biology");
+    CHECK(results[1].reason.find("department not found") !=
+          std::string::npos);
+
+    CHECK(physicsBudget.spent() == Money::of(300));
+    CHECK(csBudget.spent() == Money::of(200));
+    CHECK(defaultBudget.spent() == Money::of(100));
+
+    const auto& cancellation = acq.cancelOrder(csOrderNo);
+
+    CHECK(cancellation.cancellation);
+    CHECK(cancellation.relatedOrderNo == csOrderNo);
+    CHECK(cancellation.department == "Computer Science");
+
+    CHECK(csBudget.spent() == Money{});
+    CHECK(csBudget.usageFor(ResourceCategory::Book).units == 0);
+    CHECK(csBudget.usageFor(ResourceCategory::Book).titles == 0);
+
+    CHECK(physicsBudget.spent() == Money::of(300));
+    CHECK(defaultBudget.spent() == Money::of(100));
+    CHECK(c.holdings("B1") == 2);
+
+    CHECK(acq.history()[defaultOrderNo - 1].department.empty());
+    CHECK(acq.history()[physicsOrderNo - 1].department == "Physics");
+}
+
 static void testAcquisition() {
     Catalog c;
     c.emplace<Book>("B1", "Book", std::vector<std::string>{"A"}, "i", "P", 2020,
@@ -679,6 +788,7 @@ int main() {
     testBudget();
     testTitleQuota();
     testCancelOrder();
+    testDepartmentBudgets();
     testAcquisition();
     std::cout << (g_checks - g_failures) << "/" << g_checks << " checks passed\n";
     return g_failures == 0 ? 0 : 1;

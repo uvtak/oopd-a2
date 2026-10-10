@@ -301,5 +301,59 @@ titleBudget.print(std::cout);
               << cancelBudget.usageFor(ResourceCategory::Book).titles
               << "/2\n";
 
+    std::cout << "\n=== Q10 Department Budget Demo ===\n";
+
+    Catalog departmentCatalog;
+
+    departmentCatalog.emplace<Book>(
+        "D001", "Computer Science Book",
+        std::vector<std::string>{"Author"},
+        "ISBN-D001", "Publisher", 2026, Money::of(100)
+    );
+
+    departmentCatalog.emplace<Book>(
+        "D002", "Physics Book",
+        std::vector<std::string>{"Author"},
+        "ISBN-D002", "Publisher", 2026, Money::of(100)
+    );
+
+    Budget defaultBudget(Money::of(1000));
+
+    Budget csBudget(Money::of(300));
+    csBudget.setQuota(
+        ResourceCategory::Book,
+        {5, Money::of(200), 2}
+    );
+
+    Budget physicsBudget(Money::of(500));
+    physicsBudget.setQuota(
+        ResourceCategory::Book,
+        {5, Money::of(400), 2}
+    );
+
+    AcquisitionManager departmentAcq(departmentCatalog, defaultBudget);
+
+    departmentAcq.registerDepartment("Computer Science", csBudget);
+    departmentAcq.registerDepartment("Physics", physicsBudget);
+
+    departmentAcq.processBatch({
+        {"D001", 2, "Computer Science"},
+        {"D002", 2, "Physics"},
+        {"D001", 1, "Computer Science"},
+        {"D002", 1, "Biology"}
+    });
+
+    departmentAcq.printReport(std::cout);
+
+    std::cout << "\nComputer Science budget:\n";
+    csBudget.print(std::cout);
+
+    std::cout << "\nPhysics budget:\n";
+    physicsBudget.print(std::cout);
+
+    std::cout << "\nDefault budget:\n";
+    defaultBudget.print(std::cout);
+
+
 return 0;
 }
