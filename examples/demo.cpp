@@ -550,5 +550,69 @@ for (const Resource* resource :
      searchCatalog.searchYearRange(2015, 2018)) {
     std::cout << "  " << resource->summary() << "\n";
 }
+// Official PDF Q14: Lending and licensed electronic sessions.
+std::cout << "\n=== Official PDF Q14: Lending ===\n";
+
+Catalog lendingCatalog;
+
+lendingCatalog.emplace<Book>(
+    "L-B1", "Lending Demo Book",
+    std::vector<std::string>{"Author"},
+    "ISBN-LB1", "Publisher", 2026, Money::of(100)
+);
+
+lendingCatalog.emplace<ElectronicResource>(
+    "L-R1", "Lending Demo Database",
+    "Publisher", 2026, Money::of(20),
+    "https://lending.example",
+    LicenseModel::AnnualSubscription,
+    Money{}
+);
+
+// The library owns three book copies and two database seats.
+lendingCatalog.addHoldings("L-B1", 3);
+lendingCatalog.addHoldings("L-R1", 2);
+
+LendingManager lending(lendingCatalog);
+
+std::cout << "Available book copies initially: "
+          << lending.availableCopies("L-B1") << "\n";
+
+lending.borrowCopies("P001", "L-B1", 2);
+lending.borrowCopies("P002", "L-B1", 1);
+
+std::cout << "P001 borrowed: "
+          << lending.borrowedCopies("P001", "L-B1")
+          << " copies\n";
+
+std::cout << "Available book copies after borrowing: "
+          << lending.availableCopies("L-B1") << "\n";
+
+lending.returnCopies("P001", "L-B1", 1);
+
+std::cout << "P001 borrowed after returning one: "
+          << lending.borrowedCopies("P001", "L-B1")
+          << " copies\n";
+
+std::cout << "Available book copies after return: "
+          << lending.availableCopies("L-B1") << "\n";
+
+std::cout << "\nAvailable database seats initially: "
+          << lending.availableSeats("L-R1") << "\n";
+
+lending.openSession("P001", "L-R1");
+lending.openSession("P002", "L-R1");
+
+std::cout << "P001 active sessions: "
+          << lending.activeSessions("P001", "L-R1") << "\n";
+
+std::cout << "Available database seats after opening sessions: "
+          << lending.availableSeats("L-R1") << "\n";
+
+lending.closeSession("P001", "L-R1");
+
+std::cout << "Available database seats after closing P001's session: "
+          << lending.availableSeats("L-R1") << "\n";
+
 return 0;
 }

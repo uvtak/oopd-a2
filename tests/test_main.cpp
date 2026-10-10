@@ -536,6 +536,120 @@ static void testCatalogSearches() {
         std::invalid_argument
     );
 }
+// Official PDF Q14: Print lending and electronic sessions.
+static void testLending() {
+    Catalog c;
+
+    c.emplace<Book>(
+        "LB1", "Lending Book",
+        std::vector<std::string>{"Author"},
+        "ISBN-LB1", "Publisher", 2026, Money::of(100)
+    );
+
+    c.emplace<ElectronicResource>(
+        "LR1", "Lending Database",
+        "Publisher", 2026, Money::of(20),
+        "https://lending.example",
+        LicenseModel::AnnualSubscription,
+        Money{}
+    );
+
+    // Three print copies and two electronic seats are available.
+    c.addHoldings("LB1", 3);
+    c.addHoldings("LR1", 2);
+
+    LendingManager lending(c);
+
+    CHECK(lending.availableCopies("LB1") == 3);
+    CHECK(lending.availableSeats("LR1") == 2);
+
+    // Patron P1 borrows two copies.
+    lending.borrowCopies("P1", "LB1", 2);
+
+    CHECK(lending.borrowedCopies("P1", "LB1") == 2);
+    CHECK(lending.availableCopies("LB1") == 1);
+
+    // Patron P2 borrows the last available copy.
+    lending.borrowCopies("P2", "LB1", 1);
+
+    CHECK(lending.availableCopies("LB1") == 0);
+
+    // No more copies can be borrowed.
+    CHECK_THROWS(
+        lending.borrowCopies("P3", "LB1", 1),
+        std::invalid_argument
+    );
+
+    // Returning a copy makes it available again.
+    lending.returnCopies("P1", "LB1", 1);
+
+    CHECK(lending.borrowedCopies("P1", "LB1") == 1);
+    CHECK(lending.availableCopies("LB1") == 1);
+
+    // A patron cannot return more copies than they borrowed.
+    CHECK_THROWS(
+        lending.returnCopies("P1", "LB1", 2),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        lending.borrowCopies("P1", "LB1", 0),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        lending.borrowCopies("", "LB1", 1),
+        std::invalid_argument
+    );
+
+    // Electronic resources use sessions instead of copy lending.
+    CHECK_THROWS(
+        lending.borrowCopies("P1", "LR1", 1),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        lending.availableSeats("LB1"),
+        std::invalid_argument
+    );
+
+    // Two licensed seats permit two concurrent sessions.
+    lending.openSession("P1", "LR1");
+
+    CHECK(lending.activeSessions("P1", "LR1") == 1);
+    CHECK(lending.availableSeats("LR1") == 1);
+
+    lending.openSession("P2", "LR1");
+
+    CHECK(lending.availableSeats("LR1") == 0);
+
+    CHECK_THROWS(
+        lending.openSession("P3", "LR1"),
+        std::invalid_argument
+    );
+
+    // Closing a session releases a licensed seat.
+    lending.closeSession("P1", "LR1");
+
+    CHECK(lending.activeSessions("P1", "LR1") == 0);
+    CHECK(lending.availableSeats("LR1") == 1);
+
+    CHECK_THROWS(
+        lending.closeSession("P1", "LR1"),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        lending.openSession("P1", "LB1"),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        lending.borrowCopies("P1", "UNKNOWN", 1),
+        NotFoundError
+    );
+}
+
 static void testBudget() {
     Budget b(Money::of(1000));
     b.setQuota(ResourceCategory::Book, {5, Money::of(400)});
@@ -1120,6 +1234,7 @@ int main() {
     testTaxes();
     testCatalog();
     testCatalogSearches();
+    testLending();
     testBudget();
     testBudgetRollover();
     testBudgetWarnings();

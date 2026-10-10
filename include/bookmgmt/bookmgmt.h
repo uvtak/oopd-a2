@@ -5,6 +5,7 @@
 #include "bookmgmt/Book.h"
 #include "bookmgmt/Budget.h"
 #include "bookmgmt/Catalog.h"
+#include "bookmgmt/Lending.h"
 #include "bookmgmt/ElectronicResource.h"
 #include "bookmgmt/Exceptions.h"
 #include "bookmgmt/Money.h"
