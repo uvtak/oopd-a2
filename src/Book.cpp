@@ -25,13 +25,14 @@ Book::Book(std::string id, std::string title, std::vector<std::string> authors,
     if (edition_ < 1) throw std::invalid_argument("edition must be >= 1");
 }
 Money Book::costFor(int quantity) const {
-    requirePositive(quantity);
+    return costForAtPrice(quantity, unitPrice());
+}
 
-    Money total = Resource::costFor(quantity);
+Money Book::costForAtPrice(int quantity, Money price) const {
+    Money total = Resource::costForAtPrice(quantity, price);
 
     if (binding_ == Binding::Hardcover) {
-        // Hardcover costs 20% more than the listed price.
-        // Money is stored in minor units, so use integer arithmetic.
+        // Hardcover costs 20% more.
         return Money::fromMinor((total.minorUnits() * 6) / 5);
     }
 

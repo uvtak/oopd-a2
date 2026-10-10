@@ -6,12 +6,73 @@
 #include <stdexcept>
 #include <utility>
 #include "bookmgmt/Exceptions.h"
-
+#include <algorithm>
 namespace bookmgmt {
 
 AcquisitionManager::AcquisitionManager(Catalog& catalog, Budget& budget)
     : catalog_(catalog), budget_(budget) {}
+void AcquisitionManager::addVendorOffer(
+    const std::string& resourceId,
+    const std::string& vendorName,
+    Money unitPrice
+) {
+    if (!catalog_.find(resourceId)) {
+        throw NotFoundError(resourceId);
+    }
 
+    if (vendorName.empty()) {
+        throw std::invalid_argument("vendor name must not be empty");
+    }
+
+    if (unitPrice.isNegative()) {
+        throw std::invalid_argument("vendor price must not be negative");
+    }
+
+    auto& offers = vendorOffers_[resourceId];
+
+    for (auto& offer : offers) {
+        if (offer.vendorName == vendorName) {
+            offer.unitPrice = unitPrice;
+            return;
+        }
+    }
+
+    offers.push_back(VendorOffer{vendorName, unitPrice});
+}
+
+const std::vector<VendorOffer>&
+AcquisitionManager::vendorOffersFor(
+    const std::string& resourceId
+) const {
+    static const std::vector<VendorOffer> emptyOffers;
+
+    const auto it = vendorOffers_.find(resourceId);
+
+    if (it == vendorOffers_.end()) {
+        return emptyOffers;
+    }
+
+    return it->second;
+}
+
+AcquisitionManager::SelectedOffer
+AcquisitionManager::cheapestOffer(const Resource& resource) const {
+    const auto& offers = vendorOffersFor(resource.id());
+
+    if (offers.empty()) {
+        return {"", resource.unitPrice()};
+    }
+
+    const auto cheapest = std::min_element(
+        offers.begin(),
+        offers.end(),
+        [](const VendorOffer& a, const VendorOffer& b) {
+            return a.unitPrice < b.unitPrice;
+        }
+    );
+
+    return {cheapest->vendorName, cheapest->unitPrice};
+}
 void AcquisitionManager::registerDepartment(
     const std::string& name, Budget& departmentBudget) {
     if (name.empty())
@@ -69,8 +130,14 @@ Money AcquisitionManager::postTaxCost(const Resource& r, Money preTaxCost) const
     return Money::fromMinor(preTaxCost.minorUnits() + taxMinor);
 }
 
-Money AcquisitionManager::quote(const std::string& id, int quantity) const {
-    return catalog_.get(id).costFor(quantity);
+Money AcquisitionManager::quote(
+    const std::string& id,
+    int quantity
+) const {
+    const Resource& resource = catalog_.get(id);
+    const SelectedOffer offer = cheapestOffer(resource);
+
+    return resource.costForAtPrice(quantity, offer.unitPrice);
 }
 
 bool AcquisitionManager::canPurchase(const std::string& id, int quantity,
@@ -78,45 +145,60 @@ bool AcquisitionManager::canPurchase(const std::string& id, int quantity,
     return canPurchase(id, quantity, std::string{}, reason);
 }
 
-bool AcquisitionManager::canPurchase(const std::string& id, int quantity,
-                                     const std::string& department,
-                                     std::string* reason) const {
+bool AcquisitionManager::canPurchase(
+    const std::string& id,
+    int quantity,
+    const std::string& department,
+    std::string* reason
+) const {
     std::string why;
 
-    if (const Resource* r = catalog_.find(id)) {
-        if (quantity <= 0) {
-            why = "quantity must be positive";
-        } else {
-            const Budget* selectedBudget = budgetFor(department);
+    const Resource* resource = catalog_.find(id);
 
-            if (!selectedBudget) {
-                why = "department not found: " + department;
-            } else {
-                const Money preTaxCost = r->costFor(quantity);
-                const Money cost = postTaxCost(*r, preTaxCost);
-
-                why = selectedBudget->check(
-                    r->category(), quantity, cost, r->title());
-            }
-        }
-    } else {
+    if (!resource) {
         why = "resource not found: " + id;
+    } else if (quantity <= 0) {
+        why = "quantity must be positive";
+    } else {
+        const Budget* selectedBudget = budgetFor(department);
+
+        if (!selectedBudget) {
+            why = "department not found: " + department;
+        } else {
+            const SelectedOffer offer = cheapestOffer(*resource);
+
+            const Money preTaxCost =
+                resource->costForAtPrice(quantity, offer.unitPrice);
+
+            const Money cost = postTaxCost(*resource, preTaxCost);
+
+            why = selectedBudget->check(
+                resource->category(),
+                quantity,
+                cost,
+                resource->title()
+            );
+        }
     }
 
-    if (reason)
+    if (reason) {
         *reason = why;
+    }
 
     return why.empty();
 }
 
-PurchaseRecord& AcquisitionManager::record(const Resource* r,
-                                           const std::string& id,
-                                           int qty,
-                                           Money preTaxCost,
-                                           Money cost,
-                                           bool approved,
-                                           std::string reason,
-                                           const std::string& department) {
+PurchaseRecord& AcquisitionManager::record(
+    const Resource* r,
+    const std::string& id,
+    int qty,
+    Money preTaxCost,
+    Money cost,
+    bool approved,
+    std::string reason,
+    const std::string& department,
+    const std::string& vendor
+) {
     history_.push_back(PurchaseRecord{
         nextOrderNo_++,
         id,
@@ -127,7 +209,8 @@ PurchaseRecord& AcquisitionManager::record(const Resource* r,
         cost,
         approved,
         std::move(reason),
-        department
+        department,
+        vendor
     });
 
     return history_.back();
@@ -138,23 +221,47 @@ const PurchaseRecord& AcquisitionManager::purchase(const std::string& id,
     return purchase(id, quantity, std::string{});
 }
 
-const PurchaseRecord& AcquisitionManager::purchase(const std::string& id,
-                                                   int quantity,
-                                                   const std::string& department) {
+const PurchaseRecord& AcquisitionManager::purchase(
+    const std::string& id,
+    int quantity,
+    const std::string& department
+) {
     Budget* selectedBudget = budgetFor(department);
 
-    if (!selectedBudget)
-        throw std::invalid_argument("department not found: " + department);
+    if (!selectedBudget) {
+        throw std::invalid_argument(
+            "department not found: " + department
+        );
+    }
 
-    const Resource& r = catalog_.get(id);
+    const Resource& resource = catalog_.get(id);
+    const SelectedOffer offer = cheapestOffer(resource);
 
-    const Money preTaxCost = r.costFor(quantity);
-    const Money cost = postTaxCost(r, preTaxCost);
+    const Money preTaxCost =
+        resource.costForAtPrice(quantity, offer.unitPrice);
 
-    selectedBudget->commit(r.category(), quantity, cost, r.title());
+    const Money cost = postTaxCost(resource, preTaxCost);
+
+    selectedBudget->commit(
+        resource.category(),
+        quantity,
+        cost,
+        resource.title()
+    );
+
     catalog_.addHoldings(id, quantity);
 
-    return record(&r, id, quantity, preTaxCost, cost, true, {}, department);
+    return record(
+        &resource,
+        id,
+        quantity,
+        preTaxCost,
+        cost,
+        true,
+        {},
+        department,
+        offer.vendorName
+    );
 }
 
 const PurchaseRecord& AcquisitionManager::cancelOrder(int orderNo) {
@@ -222,7 +329,7 @@ const PurchaseRecord& AcquisitionManager::cancelOrder(int orderNo) {
         -original.quantity
     );
 
-    PurchaseRecord& cancellationRecord = record(
+       PurchaseRecord& cancellationRecord = record(
         r,
         original.resourceId,
         original.quantity,
@@ -230,7 +337,8 @@ const PurchaseRecord& AcquisitionManager::cancelOrder(int orderNo) {
         Money::fromMinor(-original.cost.minorUnits()),
         true,
         {},
-        original.department
+        original.department,
+        original.vendor
     );
 
     cancellationRecord.cancellation = true;
@@ -249,50 +357,50 @@ std::vector<PurchaseRecord> AcquisitionManager::processBatch(
             PurchaseRequest request;
             Money preTaxCost;
             Money cost;
+            std::string vendor;
             std::string reason;
         };
 
         std::vector<PendingRequest> pending;
         pending.reserve(reqs.size());
 
-        // Work with budget copies before changing the real budgets.
         Budget simulatedDefault = budget_;
-
         std::map<std::string, Budget> simulatedDepartments;
 
         for (const auto& entry : departments_) {
-            simulatedDepartments.emplace(
-                entry.first, *entry.second
-            );
+            simulatedDepartments.emplace(entry.first, *entry.second);
         }
 
         std::size_t firstRejected = reqs.size();
 
-        // Check the entire batch in order.
         for (std::size_t i = 0; i < reqs.size(); ++i) {
             const PurchaseRequest& req = reqs[i];
-            const Resource* r = catalog_.find(req.resourceId);
+            const Resource* resource = catalog_.find(req.resourceId);
 
             Money preTaxCost;
             Money cost;
+            std::string vendor;
             std::string why;
 
-            if (!r) {
+            if (!resource) {
                 why = "resource not found: " + req.resourceId;
             } else if (req.quantity <= 0) {
                 why = "quantity must be positive";
             } else {
-                preTaxCost = r->costFor(req.quantity);
-                cost = postTaxCost(*r, preTaxCost);
+                const SelectedOffer offer = cheapestOffer(*resource);
+                vendor = offer.vendorName;
+
+                preTaxCost =
+                    resource->costForAtPrice(req.quantity, offer.unitPrice);
+
+                cost = postTaxCost(*resource, preTaxCost);
 
                 Budget* selectedBudget = nullptr;
 
                 if (req.department.empty()) {
                     selectedBudget = &simulatedDefault;
                 } else {
-                    auto it = simulatedDepartments.find(
-                        req.department
-                    );
+                    auto it = simulatedDepartments.find(req.department);
 
                     if (it != simulatedDepartments.end()) {
                         selectedBudget = &it->second;
@@ -300,42 +408,43 @@ std::vector<PurchaseRecord> AcquisitionManager::processBatch(
                 }
 
                 if (!selectedBudget) {
-                    why = "department not found: " +
-                          req.department;
+                    why = "department not found: " + req.department;
                 } else {
                     why = selectedBudget->check(
-                        r->category(),
+                        resource->category(),
                         req.quantity,
                         cost,
-                        r->title()
+                        resource->title()
                     );
 
-                    // Update only the simulated budget.
                     if (why.empty()) {
                         selectedBudget->commit(
-                            r->category(),
+                            resource->category(),
                             req.quantity,
                             cost,
-                            r->title()
+                            resource->title()
                         );
                     }
                 }
             }
 
-            if (!why.empty() &&
-                firstRejected == reqs.size()) {
+            if (!why.empty() && firstRejected == reqs.size()) {
                 firstRejected = i;
             }
 
             pending.push_back(PendingRequest{
-                r, req, preTaxCost, cost, std::move(why)
+                resource,
+                req,
+                preTaxCost,
+                cost,
+                std::move(vendor),
+                std::move(why)
             });
         }
 
         std::vector<PurchaseRecord> results;
         results.reserve(reqs.size());
 
-        // If any request fails, reject the entire batch.
         if (firstRejected != reqs.size()) {
             const std::string abortReason =
                 "batch aborted because request " +
@@ -357,15 +466,14 @@ std::vector<PurchaseRecord> AcquisitionManager::processBatch(
                     item.cost,
                     false,
                     std::move(reason),
-                    item.request.department
+                    item.request.department,
+                    item.vendor
                 ));
             }
 
             return results;
         }
 
-        // All requests passed preflight.
-        // Now perform the actual purchases.
         for (const auto& req : reqs) {
             results.push_back(purchase(
                 req.resourceId,
@@ -382,54 +490,58 @@ std::vector<PurchaseRecord> AcquisitionManager::processBatch(
     results.reserve(reqs.size());
 
     for (const auto& req : reqs) {
-        const Resource* r = catalog_.find(req.resourceId);
-        const Budget* selectedBudget = budgetFor(req.department);
+        const Resource* resource = catalog_.find(req.resourceId);
 
         Money preTaxCost;
         Money cost;
+        std::string vendor;
         std::string why;
 
-        if (!r) {
+        if (!resource) {
             why = "resource not found: " + req.resourceId;
         } else if (req.quantity <= 0) {
             why = "quantity must be positive";
         } else {
-            preTaxCost = r->costFor(req.quantity);
-            cost = postTaxCost(*r, preTaxCost);
+            const SelectedOffer offer = cheapestOffer(*resource);
+            vendor = offer.vendorName;
+
+            preTaxCost =
+                resource->costForAtPrice(req.quantity, offer.unitPrice);
+
+            cost = postTaxCost(*resource, preTaxCost);
+
+            const Budget* selectedBudget = budgetFor(req.department);
 
             if (!selectedBudget) {
                 why = "department not found: " + req.department;
             } else {
                 why = selectedBudget->check(
-                    r->category(),
+                    resource->category(),
                     req.quantity,
                     cost,
-                    r->title()
+                    resource->title()
                 );
             }
         }
 
         if (why.empty()) {
-            results.push_back(
-                purchase(
-                    req.resourceId,
-                    req.quantity,
-                    req.department
-                )
-            );
+            results.push_back(purchase(
+                req.resourceId,
+                req.quantity,
+                req.department
+            ));
         } else {
-            results.push_back(
-                record(
-                    r,
-                    req.resourceId,
-                    req.quantity,
-                    preTaxCost,
-                    cost,
-                    false,
-                    why,
-                    req.department
-                )
-            );
+            results.push_back(record(
+                resource,
+                req.resourceId,
+                req.quantity,
+                preTaxCost,
+                cost,
+                false,
+                why,
+                req.department,
+                vendor
+            ));
         }
     }
 
@@ -458,6 +570,9 @@ void AcquisitionManager::printReport(std::ostream& os) const {
            << " pre-tax " << rec.preTaxCost.toString()
            << " post-tax " << rec.cost.toString()
            << "  " << rec.title;
+             if (!rec.vendor.empty()) {
+            os << "  vendor: " << rec.vendor;
+        }
 
         if (!rec.department.empty())
             os << "  department: " << rec.department;

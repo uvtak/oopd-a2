@@ -15,7 +15,10 @@ struct PurchaseRequest {
     int quantity;
     std::string department{};
 };
-
+struct VendorOffer {
+    std::string vendorName;
+    Money unitPrice;
+};
 struct PurchaseRecord {
     int orderNo;
     std::string resourceId;
@@ -29,6 +32,7 @@ struct PurchaseRecord {
     bool approved;
     std::string reason;
     std::string department;
+    std::string vendor;
     bool cancellation = false;
     int relatedOrderNo = 0;
 };
@@ -73,12 +77,27 @@ std::vector<PurchaseRecord> processBatch(
     Money totalSpent() const;
 
     void printReport(std::ostream& os) const;
+    void addVendorOffer(
+    const std::string& resourceId,
+    const std::string& vendorName,
+    Money unitPrice
+);
+
+    const std::vector<VendorOffer>& vendorOffersFor(
+    const std::string& resourceId
+) const;
 
 private:
+    struct SelectedOffer {
+    std::string vendorName;
+    Money unitPrice;
+};
+
+    SelectedOffer cheapestOffer(const Resource& resource) const;
     PurchaseRecord& record(const Resource* r, const std::string& id,
                            int qty, Money preTaxCost, Money cost,
                            bool approved, std::string reason,
-                           const std::string& department);
+                           const std::string& department, const std::string& vendor);
 
     Budget* budgetFor(const std::string& department);
     const Budget* budgetFor(const std::string& department) const;
@@ -92,7 +111,7 @@ private:
     Budget& budget_;
     std::map<std::string, Budget*> departments_;
     std::vector<PurchaseRecord> history_;
-
+    std::map<std::string, std::vector<VendorOffer>> vendorOffers_;
     int nextOrderNo_ = 1;
 };
 

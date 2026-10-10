@@ -455,5 +455,53 @@ std::cout
 std::cout
     << "Second book holdings: "
     << atomicCatalog.holdings("AB2") << "\n";
+    // Official PDF Q12: Multiple vendors and cheapest-price selection.
+std::cout << "\n=== Official PDF Q12: Vendor Selection ===\n";
+
+Catalog vendorCatalog;
+
+vendorCatalog.emplace<Book>(
+    "VB1", "Vendor Demo Book",
+    std::vector<std::string>{"Author"},
+    "ISBN-VB1", "Publisher", 2026, Money::of(100)
+);
+
+vendorCatalog.emplace<ElectronicResource>(
+    "VR1", "Vendor Demo Database",
+    "Publisher", 2026, Money::of(10),
+    "https://vendor.example",
+    LicenseModel::AnnualSubscription,
+    Money::of(50)
+);
+
+Budget vendorBudget(Money::of(10000));
+AcquisitionManager vendorAcq(vendorCatalog, vendorBudget);
+
+vendorAcq.addVendorOffer("VB1", "Campus Books", Money::of(120));
+vendorAcq.addVendorOffer("VB1", "Budget Books", Money::of(80));
+vendorAcq.addVendorOffer("VB1", "City Books", Money::of(95));
+
+vendorAcq.addVendorOffer("VR1", "Digital Source", Money::of(12));
+vendorAcq.addVendorOffer("VR1", "EduAccess", Money::of(8));
+
+std::cout << "Book vendor offers:\n";
+
+for (const auto& offer : vendorAcq.vendorOffersFor("VB1")) {
+    std::cout << "  " << offer.vendorName
+              << ": " << offer.unitPrice << " per copy\n";
+}
+
+std::cout << "Cheapest quote for 2 books: "
+          << vendorAcq.quote("VB1", 2) << "\n";
+
+vendorAcq.processBatch({
+    {"VB1", 2},
+    {"VR1", 3}
+});
+
+vendorAcq.printReport(std::cout);
+
+std::cout << "\nBudget after vendor purchases:\n";
+vendorBudget.print(std::cout);
 return 0;
 }

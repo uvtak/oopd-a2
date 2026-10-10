@@ -21,6 +21,7 @@ public:
     }
 
     Money costFor(int copies) const override;
+    Money costForAtPrice(int copies, Money unitPrice) const override;
 
 protected:
     void printDetails(std::ostream& os) const override;

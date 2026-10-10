@@ -49,6 +49,7 @@ public:
     // licences. Default: unitPrice * quantity. Throws if quantity <= 0.
     // EXTENSION POINT: override for discounts, fees, tiered pricing, ...
     virtual Money costFor(int quantity) const;
+    virtual Money costForAtPrice(int quantity, Money unitPrice) const;
 
     // Writes a multi-line human-readable description.
     void print(std::ostream& os) const;

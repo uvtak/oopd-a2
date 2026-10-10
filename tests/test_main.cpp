@@ -915,6 +915,101 @@ static void testAllOrNothingBatch() {
     CHECK(c.holdings("B1") == 1);
     CHECK(c.holdings("B2") == 1);
 }
+// Official PDF Q12: Vendor selection and vendor price recording.
+static void testVendors() {
+    Catalog c;
+
+    c.emplace<Book>(
+        "VB1", "Vendor Book",
+        std::vector<std::string>{"Author"},
+        "ISBN-VB1", "Publisher", 2026, Money::of(100)
+    );
+
+    c.emplace<ElectronicResource>(
+        "VR1", "Vendor Database",
+        "Publisher", 2026, Money::of(10),
+        "https://vendor.example",
+        LicenseModel::AnnualSubscription,
+        Money::of(50)
+    );
+
+    c.emplace<Book>(
+        "VB2", "Book Without Offers",
+        std::vector<std::string>{"Author"},
+        "ISBN-VB2", "Publisher", 2026, Money::of(30)
+    );
+
+    Budget b(Money::of(10000));
+    AcquisitionManager acq(c, b);
+
+    // Register vendors with different prices.
+    acq.addVendorOffer("VB1", "Campus Books", Money::of(120));
+    acq.addVendorOffer("VB1", "Budget Books", Money::of(80));
+    acq.addVendorOffer("VB1", "City Books", Money::of(95));
+
+    acq.addVendorOffer("VR1", "Digital Source", Money::of(12));
+    acq.addVendorOffer("VR1", "EduAccess", Money::of(8));
+
+    CHECK(acq.vendorOffersFor("VB1").size() == 3);
+    CHECK(acq.vendorOffersFor("VR1").size() == 2);
+
+    // Cheapest book vendor: 80 x 2.
+    CHECK(acq.quote("VB1", 2) == Money::of(160));
+
+    const PurchaseRecord bookRecord = acq.purchase("VB1", 2);
+
+    CHECK(bookRecord.approved);
+    CHECK(bookRecord.vendor == "Budget Books");
+    CHECK(bookRecord.cost == Money::of(160));
+    CHECK(c.holdings("VB1") == 2);
+
+    // Electronic resource: platform fee 50 + (8 x 3).
+    CHECK(acq.quote("VR1", 3) == Money::of(74));
+
+    const PurchaseRecord electronicRecord =
+        acq.purchase("VR1", 3);
+
+    CHECK(electronicRecord.approved);
+    CHECK(electronicRecord.vendor == "EduAccess");
+    CHECK(electronicRecord.cost == Money::of(74));
+    CHECK(c.holdings("VR1") == 3);
+
+    // Without vendor offers, use the catalogue price.
+    const PurchaseRecord fallbackRecord = acq.purchase("VB2", 1);
+
+    CHECK(fallbackRecord.approved);
+    CHECK(fallbackRecord.vendor.empty());
+    CHECK(fallbackRecord.cost == Money::of(30));
+
+    // Updating an existing vendor must not create a duplicate.
+    acq.addVendorOffer("VB1", "Campus Books", Money::of(70));
+
+    CHECK(acq.vendorOffersFor("VB1").size() == 3);
+    CHECK(acq.quote("VB1", 1) == Money::of(70));
+
+    const PurchaseRecord updatedRecord = acq.purchase("VB1", 1);
+
+    CHECK(updatedRecord.vendor == "Campus Books");
+    CHECK(updatedRecord.cost == Money::of(70));
+
+    // Invalid vendor offers must be rejected.
+    CHECK_THROWS(
+        acq.addVendorOffer("VB1", "", Money::of(50)),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        acq.addVendorOffer("VB1", "Negative Price", Money::of(-1)),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        acq.addVendorOffer("UNKNOWN", "Vendor", Money::of(50)),
+        NotFoundError
+    );
+
+    CHECK(b.spent() == Money::of(334));
+}
 static void testAcquisition() {
     Catalog c;
     c.emplace<Book>("B1", "Book", std::vector<std::string>{"A"}, "i", "P", 2020,
@@ -970,6 +1065,7 @@ int main() {
     testCancelOrder();
     testDepartmentBudgets();
     testAllOrNothingBatch();
+    testVendors();
     testAcquisition();
     std::cout << (g_checks - g_failures) << "/" << g_checks << " checks passed\n";
     return g_failures == 0 ? 0 : 1;

@@ -22,6 +22,7 @@ public:
 
     ResourceCategory category() const override { return ResourceCategory::Book; }
     Money costFor(int quantity) const override;
+    Money costForAtPrice(int quantity, Money unitPrice) const override;
     
 
 protected:

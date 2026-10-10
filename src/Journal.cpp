@@ -18,12 +18,19 @@ Journal::Journal(std::string id, std::string title, std::string issn,
 }
 
 Money Journal::costFor(int copies) const {
+    return costForAtPrice(copies, unitPrice());
+}
+
+Money Journal::costForAtPrice(int copies, Money price) const {
     requirePositive(copies);
 
-    Money total = unitPrice() * copies * subscriptionYears_;
+    if (price.isNegative()) {
+        throw std::invalid_argument("price must not be negative");
+    }
+
+    Money total = price * copies * subscriptionYears_;
 
     if (copies >= 10) {
-        // 10% bulk discount for print items.
         return Money::fromMinor((total.minorUnits() * 9) / 10);
     }
 

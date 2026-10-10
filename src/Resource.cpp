@@ -40,9 +40,17 @@ void Resource::requirePositive(int quantity) {
 }
 
 Money Resource::costFor(int quantity) const {
+    return costForAtPrice(quantity, unitPrice());
+}
+
+Money Resource::costForAtPrice(int quantity, Money price) const {
     requirePositive(quantity);
 
-    Money total = unitPrice() * quantity;
+    if (price.isNegative()) {
+        throw std::invalid_argument("price must not be negative");
+    }
+
+    Money total = price * quantity;
 
     if (quantity >= 10) {
         // 10% bulk discount for print resources.
