@@ -92,6 +92,7 @@ catalog.emplace<Thesis>(
     std::cout << "20 seats of R001  = " << acq.quote("R001", 20) << "  (incl. platform fee)\n";
     std::cout << "2 copies of J001  = " << acq.quote("J001", 2) << "  (2-year subscription)\n";
     std::cout << "2 copies of M001  = " << acq.quote("M001", 2) << "  (includes postage)\n";
+    std::cout << "10 copies of M001 = " << acq.quote("M001", 10) << "  (postage included, 10% bulk discount)\n";
     std::cout << "3 seats of E001   = " << acq.quote("E001", 3) << "  (incl. platform fee)\n";
     std::cout << "10 copies of B001 = " << acq.quote("B001", 10) << "  (10% bulk discount)\n";
     std::cout << "10 copies of J001 = " << acq.quote("J001", 10) << "  (10% bulk discount)\n";

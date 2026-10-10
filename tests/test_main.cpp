@@ -137,11 +137,11 @@ static void testMagazine() {
     CHECK(m.costFor(2) == Money::of(4080));
     // 10 copies:
     // Subscription = 500 × 10 × 2 = 10000
-    // 10% bulk discount = 9000
     // Postage = 10 × 52 × 10 × 2 = 10400
-    // Total = 19400
+    // Combined total = 20400
+    // 10% bulk discount = 18360
 
-    CHECK(m.costFor(10) == Money::of(19400));
+    CHECK(m.costFor(10) == Money::of(18360));
 
     CHECK_THROWS(m.costFor(0), std::invalid_argument);
 
