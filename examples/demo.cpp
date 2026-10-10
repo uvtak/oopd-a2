@@ -503,5 +503,52 @@ vendorAcq.printReport(std::cout);
 
 std::cout << "\nBudget after vendor purchases:\n";
 vendorBudget.print(std::cout);
+// Official PDF Q13: Catalogue searches.
+std::cout << "\n=== Official PDF Q13: Catalogue Searches ===\n";
+
+Catalog searchCatalog;
+
+searchCatalog.emplace<Book>(
+    "S-B1", "Algorithms",
+    std::vector<std::string>{"Ada Lovelace", "Alan Turing"},
+    "ISBN-101", "Publisher", 2015, Money::of(100)
+);
+
+searchCatalog.emplace<EBook>(
+    "S-E1", "Digital Systems",
+    std::vector<std::string>{"Ada Lovelace"},
+    "ISBN-102", "Publisher", 2020, Money::of(20),
+    "https://ebooks.example",
+    LicenseModel::AnnualSubscription,
+    Money{}, "EPUB", false
+);
+
+searchCatalog.emplace<Journal>(
+    "S-J1", "Computing Journal",
+    "ISSN-201", 12, "Publisher", 2018, Money::of(200)
+);
+
+std::cout << "\nSearch by author: Ada\n";
+for (const Resource* resource : searchCatalog.searchAuthor("Ada")) {
+    std::cout << "  " << resource->summary() << "\n";
+}
+
+std::cout << "\nSearch by ISBN: ISBN-102\n";
+for (const Resource* resource :
+     searchCatalog.searchISBNISSN("ISBN-102")) {
+    std::cout << "  " << resource->summary() << "\n";
+}
+
+std::cout << "\nSearch by ISSN: ISSN-201\n";
+for (const Resource* resource :
+     searchCatalog.searchISBNISSN("ISSN-201")) {
+    std::cout << "  " << resource->summary() << "\n";
+}
+
+std::cout << "\nSearch publication years: 2015-2018\n";
+for (const Resource* resource :
+     searchCatalog.searchYearRange(2015, 2018)) {
+    std::cout << "  " << resource->summary() << "\n";
+}
 return 0;
 }

@@ -5,6 +5,9 @@
 #include <stdexcept>
 
 #include "bookmgmt/Exceptions.h"
+#include "bookmgmt/Book.h"
+#include "bookmgmt/EBook.h"
+#include "bookmgmt/Journal.h"
 
 namespace bookmgmt {
 
@@ -87,5 +90,86 @@ std::vector<const Resource*> Catalog::searchTitle(const std::string& text) const
         return lower(r.title()).find(needle) != std::string::npos;
     });
 }
+// Official PDF Q13: Search books and e-books by author name.
+std::vector<const Resource*> Catalog::searchAuthor(
+    const std::string& text
+) const {
+    const std::string needle = lower(text);
 
+    if (needle.empty()) {
+        return {};
+    }
+
+    return where([&needle](const Resource& resource) {
+        if (const auto* book = dynamic_cast<const Book*>(&resource)) {
+            for (const auto& author : book->authors()) {
+                if (lower(author).find(needle) != std::string::npos) {
+                    return true;
+                }
+            }
+        }
+
+        if (const auto* ebook = dynamic_cast<const EBook*>(&resource)) {
+            for (const auto& author : ebook->authors()) {
+                if (lower(author).find(needle) != std::string::npos) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    });
+}
+
+// Official PDF Q13: Search by ISBN or ISSN.
+std::vector<const Resource*> Catalog::searchISBNISSN(
+    const std::string& identifier
+) const {
+    const std::string needle = lower(identifier);
+
+    if (needle.empty()) {
+        return {};
+    }
+
+    return where([&needle](const Resource& resource) {
+        if (const auto* book = dynamic_cast<const Book*>(&resource)) {
+            if (lower(book->isbn()).find(needle) != std::string::npos) {
+                return true;
+            }
+        }
+
+        if (const auto* ebook = dynamic_cast<const EBook*>(&resource)) {
+            if (lower(ebook->isbn()).find(needle) != std::string::npos) {
+                return true;
+            }
+        }
+
+        // Magazine also inherits from Journal, so its ISSN is searchable.
+        if (const auto* journal =
+                dynamic_cast<const Journal*>(&resource)) {
+            if (lower(journal->issn()).find(needle) != std::string::npos) {
+                return true;
+            }
+        }
+
+        return false;
+    });
+}
+
+// Official PDF Q13: Search within an inclusive publication-year range.
+std::vector<const Resource*> Catalog::searchYearRange(
+    int startYear,
+    int endYear
+) const {
+    if (startYear > endYear) {
+        throw std::invalid_argument(
+            "start year must not exceed end year"
+        );
+    }
+
+    return where([startYear, endYear](const Resource& resource) {
+        return resource.year() >= startYear &&
+               resource.year() <= endYear;
+    });
+}
 }  // namespace bookmgmt

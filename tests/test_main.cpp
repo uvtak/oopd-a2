@@ -474,7 +474,68 @@ static void testCatalog() {
     CHECK(c.size() == 2);
     CHECK_THROWS(c.remove("R1"), NotFoundError);
 }
+// Official PDF Q13: Catalogue search tests.
+static void testCatalogSearches() {
+    Catalog c;
 
+    c.emplace<Book>(
+        "B1", "Algorithms",
+        std::vector<std::string>{"Ada Lovelace", "Alan Turing"},
+        "ISBN-111", "Publisher", 2001, Money::of(100)
+    );
+
+    c.emplace<Book>(
+        "B2", "Data Structures",
+        std::vector<std::string>{"Grace Hopper"},
+        "ISBN-222", "Publisher", 2015, Money::of(120)
+    );
+
+    c.emplace<EBook>(
+        "E1", "Digital Algorithms",
+        std::vector<std::string>{"Ada Lovelace"},
+        "ISBN-333", "Publisher", 2020, Money::of(20),
+        "https://ebooks.example",
+        LicenseModel::AnnualSubscription,
+        Money{}, "EPUB", false
+    );
+
+    c.emplace<Journal>(
+        "J1", "Computing Review",
+        "ISSN-444", 12, "Publisher", 1999, Money::of(200)
+    );
+
+    c.emplace<Magazine>(
+        "M1", "Technology Monthly",
+        "ISSN-555", 12, "Publisher", 2018,
+        Money::of(50), 1, Money::of(1)
+    );
+
+    // Search authors; case-insensitive.
+    auto adaResults = c.searchAuthor("ada");
+    CHECK(adaResults.size() == 2);
+
+    CHECK(c.searchAuthor("GRACE").size() == 1);
+    CHECK(c.searchAuthor("").empty());
+
+    // Search ISBN for both books and e-books.
+    auto bookIsbnResults = c.searchISBNISSN("ISBN-222");
+    CHECK(bookIsbnResults.size() == 1);
+    CHECK(bookIsbnResults[0]->id() == "B2");
+
+    CHECK(c.searchISBNISSN("ISBN-333").size() == 1);
+
+    // Search ISSN for journals and magazines.
+    CHECK(c.searchISBNISSN("issn-").size() == 2);
+
+    // Both ends of the year range are inclusive.
+    CHECK(c.searchYearRange(2000, 2018).size() == 3);
+    CHECK(c.searchYearRange(2015, 2018).size() == 2);
+
+    CHECK_THROWS(
+        c.searchYearRange(2020, 2010),
+        std::invalid_argument
+    );
+}
 static void testBudget() {
     Budget b(Money::of(1000));
     b.setQuota(ResourceCategory::Book, {5, Money::of(400)});
@@ -1058,6 +1119,7 @@ int main() {
     testBulkDiscounts();
     testTaxes();
     testCatalog();
+    testCatalogSearches();
     testBudget();
     testBudgetRollover();
     testBudgetWarnings();
