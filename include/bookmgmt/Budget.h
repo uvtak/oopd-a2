@@ -57,6 +57,8 @@ public:
         // Refunds a previously recorded purchase from the budget.
     void refund(ResourceCategory c, int units, Money cost,
                 const std::string& title = {});
+    Budget rolloverToNextYear(Money nextYearBase,
+                              int carryOverPercent) const;
     void print(std::ostream& os) const;
 
 private:

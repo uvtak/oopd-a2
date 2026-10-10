@@ -499,6 +499,67 @@ static void testBudget() {
     CHECK(b.spent() == Money::of(300));  // failed commits changed nothing
 }
 
+static void testBudgetRollover() {
+    Budget current(Money::of(10000));
+
+    current.setQuota(
+        ResourceCategory::Book,
+        {10, Money::of(8000), 2}
+    );
+
+    current.commit(
+        ResourceCategory::Book,
+        7,
+        Money::of(7000),
+        "Current-year books"
+    );
+
+    CHECK(current.spent() == Money::of(7000));
+    CHECK(current.remaining() == Money::of(3000));
+
+    // 50% of 3000 is carried into the next year's base budget.
+    Budget next =
+        current.rolloverToNextYear(Money::of(12000), 50);
+
+    CHECK(next.total() == Money::of(13500));
+    CHECK(next.spent() == Money{});
+    CHECK(next.remaining() == Money::of(13500));
+
+    // The new year starts with fresh usage and no old quotas.
+    CHECK(next.usageFor(ResourceCategory::Book).units == 0);
+    CHECK(next.usageFor(ResourceCategory::Book).titles == 0);
+    CHECK(!next.quotaFor(ResourceCategory::Book).has_value());
+
+    // The original budget remains unchanged.
+    CHECK(current.total() == Money::of(10000));
+    CHECK(current.spent() == Money::of(7000));
+
+    // 0% carries nothing; 100% carries all unspent funds.
+    Budget noCarry =
+        current.rolloverToNextYear(Money::of(12000), 0);
+    CHECK(noCarry.total() == Money::of(12000));
+
+    Budget fullCarry =
+        current.rolloverToNextYear(Money::of(12000), 100);
+    CHECK(fullCarry.total() == Money::of(15000));
+
+    // Invalid percentages and a negative next-year allocation are rejected.
+    CHECK_THROWS(
+        current.rolloverToNextYear(Money::of(12000), -1),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        current.rolloverToNextYear(Money::of(12000), 101),
+        std::invalid_argument
+    );
+
+    CHECK_THROWS(
+        current.rolloverToNextYear(Money::of(-1), 50),
+        std::invalid_argument
+    );
+}
+
 static void testTitleQuota() {
     Catalog c;
 
@@ -786,6 +847,7 @@ int main() {
     testTaxes();
     testCatalog();
     testBudget();
+    testBudgetRollover();
     testTitleQuota();
     testCancelOrder();
     testDepartmentBudgets();

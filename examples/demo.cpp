@@ -355,5 +355,36 @@ titleBudget.print(std::cout);
     defaultBudget.print(std::cout);
 
 
+    std::cout << "\n=== Q11 Year-end Budget Rollover ===\n";
+
+    Budget currentYearBudget(Money::of(10000));
+
+    currentYearBudget.setQuota(
+        ResourceCategory::Book,
+        {10, Money::of(8000), 2}
+    );
+
+    currentYearBudget.commit(
+        ResourceCategory::Book,
+        7,
+        Money::of(7000),
+        "Current-year books"
+    );
+
+    std::cout << "Current year's budget:\n";
+    currentYearBudget.print(std::cout);
+
+    Budget nextYearBudget =
+        currentYearBudget.rolloverToNextYear(
+            Money::of(12000),
+            50
+        );
+
+    std::cout
+        << "\nNext year's budget "
+        << "(base 12000 + 50% of unspent amount):\n";
+
+    nextYearBudget.print(std::cout);
+
 return 0;
 }

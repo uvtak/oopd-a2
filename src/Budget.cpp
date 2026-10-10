@@ -291,6 +291,34 @@ void Budget::refund(
     }
 }
 
+Budget Budget::rolloverToNextYear(
+    Money nextYearBase,
+    int carryOverPercent
+) const {
+    if (nextYearBase.isNegative()) {
+        throw std::invalid_argument(
+            "next year's base budget must not be negative"
+        );
+    }
+
+    if (carryOverPercent < 0 || carryOverPercent > 100) {
+        throw std::invalid_argument(
+            "rollover percentage must be between 0 and 100"
+        );
+    }
+
+    const std::int64_t unspentMinor = remaining().minorUnits();
+
+    // Calculate the percentage without multiplying the full amount first.
+    const std::int64_t carryOverMinor =
+        (unspentMinor / 100) * carryOverPercent +
+        ((unspentMinor % 100) * carryOverPercent) / 100;
+
+    return Budget(
+        nextYearBase + Money::fromMinor(carryOverMinor)
+    );
+}
+
 void Budget::print(std::ostream& os) const {
     os << "Budget: total " << total_
        << ", spent " << spent_
