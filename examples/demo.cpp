@@ -386,5 +386,31 @@ titleBudget.print(std::cout);
 
     nextYearBudget.print(std::cout);
 
+    std::cout << "\n=== Q12 Quota Warnings ===\n";
+
+    Budget warningBudget(Money::of(5000));
+
+    warningBudget.setQuota(
+        ResourceCategory::Book,
+        {10, Money::of(1000), 3}
+    );
+
+    warningBudget.commit(
+        ResourceCategory::Book, 3,
+        Money::of(300), "Clean Code"
+    );
+
+    warningBudget.commit(
+        ResourceCategory::Book, 3,
+        Money::of(250), "Design Patterns"
+    );
+
+    warningBudget.commit(
+        ResourceCategory::Book, 3,
+        Money::of(300), "Effective C++"
+    );
+
+    warningBudget.print(std::cout);
+
 return 0;
 }

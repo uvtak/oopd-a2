@@ -560,6 +560,67 @@ static void testBudgetRollover() {
     );
 }
 
+static void testBudgetWarnings() {
+    Budget b(Money::of(5000));
+
+    b.setQuota(
+        ResourceCategory::Book,
+        {10, Money::of(1000), 3}
+    );
+
+    b.commit(
+        ResourceCategory::Book, 3,
+        Money::of(300), "Clean Code"
+    );
+
+    b.commit(
+        ResourceCategory::Book, 3,
+        Money::of(250), "Design Patterns"
+    );
+
+    b.commit(
+        ResourceCategory::Book, 3,
+        Money::of(300), "Effective C++"
+    );
+
+    std::ostringstream output;
+    b.print(output);
+
+    // 9/10 units = 90%.
+    CHECK(output.str().find(
+        "Book unit quota is above 80%"
+    ) != std::string::npos);
+
+    // 850/1000 spent = 85%.
+    CHECK(output.str().find(
+        "Book spend quota is above 80%"
+    ) != std::string::npos);
+
+    // 3/3 different titles = 100%.
+    CHECK(output.str().find(
+        "Book title quota is above 80%"
+    ) != std::string::npos);
+
+    // Exactly 80% must not trigger a warning.
+    Budget exact(Money::of(2000));
+
+    exact.setQuota(
+        ResourceCategory::Book,
+        {10, Money::of(1000), 5}
+    );
+
+    exact.commit(
+        ResourceCategory::Book, 8,
+        Money::of(800), "Exactly Eighty"
+    );
+
+    std::ostringstream exactOutput;
+    exact.print(exactOutput);
+
+    CHECK(exactOutput.str().find("WARNING:") ==
+          std::string::npos);
+}
+
 static void testTitleQuota() {
     Catalog c;
 
@@ -848,6 +909,7 @@ int main() {
     testCatalog();
     testBudget();
     testBudgetRollover();
+    testBudgetWarnings();
     testTitleQuota();
     testCancelOrder();
     testDepartmentBudgets();

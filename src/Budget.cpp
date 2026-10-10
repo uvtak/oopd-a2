@@ -21,6 +21,14 @@ const ResourceCategory kAllCategories[] = {
     ResourceCategory::Thesis
 };
 
+bool passesEightyPercent(long double used, long double limit) {
+    if (limit == 0.0L) {
+        return used > 0.0L;
+    }
+
+    return used / limit > 0.8L;
+}
+
 }
 
 Budget::Budget(Money total) : total_(total) {
@@ -354,6 +362,62 @@ void Budget::print(std::ostream& os) const {
            << std::setw(18) << titles
            << spend << "\n";
     }
+    
+    bool anyWarnings = false;
+
+    const auto printWarning = [&os, &anyWarnings](
+        const std::string& message
+    ) {
+        if (!anyWarnings) {
+            os << "\nWarnings:\n";
+            anyWarnings = true;
+        }
+
+        os << "  WARNING: " << message << "\n";
+    };
+
+    for (ResourceCategory c : kAllCategories) {
+        const auto q = quotaFor(c);
+
+        if (!q) {
+            continue;
+        }
+
+        const Usage u = usageFor(c);
+        const std::string category = categoryName(c);
+
+        if (passesEightyPercent(
+                static_cast<long double>(u.units),
+                static_cast<long double>(q->maxUnits))) {
+            printWarning(
+                category + " unit quota is above 80% (" +
+                std::to_string(u.units) + "/" +
+                std::to_string(q->maxUnits) + " units used)"
+            );
+        }
+
+        if (passesEightyPercent(
+                static_cast<long double>(u.spent.minorUnits()),
+                static_cast<long double>(q->maxSpend.minorUnits()))) {
+            printWarning(
+                category + " spend quota is above 80% (" +
+                u.spent.toString() + "/" +
+                q->maxSpend.toString() + " spent)"
+            );
+        }
+
+        if (q->maxTitles &&
+            passesEightyPercent(
+                static_cast<long double>(u.titles),
+                static_cast<long double>(*q->maxTitles))) {
+            printWarning(
+                category + " title quota is above 80% (" +
+                std::to_string(u.titles) + "/" +
+                std::to_string(*q->maxTitles) + " titles used)"
+            );
+        }
+    }
+
 }
 
 }  // namespace bookmgmt
